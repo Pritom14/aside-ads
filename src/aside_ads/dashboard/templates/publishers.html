@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Publishers and keys{% endblock %}
+{% block content %}
+{% if new_key %}
+<div class="flash ok">New {{ new_key_role }} key (shown once, copy it now): <code class="key">{{ new_key }}</code></div>
+{% endif %}
+<h1>Publishers and placements</h1>
+<table>
+  <thead><tr><th>Publisher</th><th>Placements</th><th>Add placement</th></tr></thead>
+  <tbody>
+  {% for p in publishers %}
+  <tr>
+    <td>{{ p.name }}<div class="muted mono">{{ p.id }}</div></td>
+    <td>{% for pl in p.placements %}<code>{{ pl.key }}</code>{% if pl.floor_cpm_micros is not none %} (floor {{ pl.floor_cpm_micros|money }} CPM){% endif %}{{ ", " if not loop.last }}{% endfor %}</td>
+    <td>
+      <form method="post" action="/dashboard/publishers/{{ p.id }}/placements" class="inline-form">
+        <input name="key" placeholder="chat-sidebar" required size="12">
+        <input name="floor_cpm" placeholder="floor CPM" size="8">
+        <button class="small">Add</button>
+      </form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="3" class="muted">No publishers yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+<form method="post" action="/dashboard/publishers" class="card">
+  <h2>Add publisher</h2>
+  <div class="grid">
+    <label>Name <input name="name" required></label>
+    <label>Domain <input name="domain" placeholder="chat.example.com"></label>
+  </div>
+  <button>Add publisher</button>
+</form>
+
+<h1>API keys</h1>
+<table>
+  <thead><tr><th>Prefix</th><th>Role</th><th>Scope</th><th>Name</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+  {% for k in keys %}
+  <tr class="{{ 'revoked' if k.revoked_at }}">
+    <td class="mono">{{ k.prefix }}...</td><td>{{ k.role }}</td>
+    <td>{{ pub_names.get(k.publisher_id) or adv_names.get(k.advertiser_id) or "all" }}</td>
+    <td>{{ k.name }}</td><td>{{ k.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+    <td>{% if k.revoked_at %}revoked{% else %}<form method="post" action="/dashboard/keys/{{ k.id }}/revoke"><button class="small danger">Revoke</button></form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form method="post" action="/dashboard/keys" class="card">
+  <h2>Create key</h2>
+  <div class="grid">
+    <label>Role
+      <select name="role"><option value="publisher">publisher (serve ads)</option><option value="advertiser">advertiser (conversion postbacks)</option><option value="admin">admin</option></select>
+    </label>
+    <label>Publisher or advertiser
+      <select name="owner_id">
+        <option value="">(none, for admin keys)</option>
+        <optgroup label="Publishers">{% for p in publishers %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</optgroup>
+        <optgroup label="Advertisers">{% for a in advertisers %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}</optgroup>
+      </select>
+    </label>
+    <label>Label <input name="name" placeholder="production"></label>
+  </div>
+  <button>Create key</button>
+</form>
+{% endblock %}

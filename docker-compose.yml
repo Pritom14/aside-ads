@@ -1,35 +1,52 @@
+# Aside with PostgreSQL and Redis.
+#   docker compose up -d --build
+#   docker compose exec aside aside seed-demo      # or: aside create-key --role admin
+# Open http://localhost:8000/dashboard
 services:
   postgres:
-    image: postgres:16
-    container_name: ads-ai-postgres
+    image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ads_ai
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: aside
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aside}
+      POSTGRES_DB: aside
     volumes:
-      - ads_ai_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ads_ai"]
+      test: ["CMD-SHELL", "pg_isready -U aside -d aside"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   redis:
     image: redis:7-alpine
-    container_name: ads-ai-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - ads_ai_redis_data:/data
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 20
+
+  aside:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aside:${POSTGRES_PASSWORD:-aside}@postgres:5432/aside
+      REDIS_URL: redis://redis:6379/0
+      # Leave empty to auto-generate one in the /data volume. Set it explicitly when running replicas.
+      ASIDE_SECRET_KEY: ${ASIDE_SECRET_KEY:-}
+      ASIDE_PUBLIC_URL: ${ASIDE_PUBLIC_URL:-http://localhost:8000}
+      ASIDE_MATCHER: ${ASIDE_MATCHER:-auto}
+    ports:
+      - "${ASIDE_PORT:-8000}:8000"
+    volumes:
+      - aside_data:/data
+      - aside_models:/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
-  ads_ai_postgres_data:
-  ads_ai_redis_data:
+  postgres_data:
+  aside_data:
+  aside_models:

@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Chat (Aside demo)</title>
+<style>
+  :root { --fg:#1d1f23; --muted:#6b7078; --line:#e3e5e8; --bg:#f7f8fa; --card:#fff; --accent:#2457d6; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--fg); background:var(--bg); }
+  header { padding:12px 20px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  header b { font-size:17px; } header span { color:var(--muted); font-size:13px; }
+  main { max-width:1040px; margin:0 auto; padding:16px 16px 140px; }
+  .turn { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:20px; margin:14px 0; align-items:start; }
+  .bubble { padding:10px 14px; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .user .bubble { background:#e8eefc; justify-self:end; max-width:85%; }
+  .assistant .bubble { background:var(--card); border:1px solid var(--line); }
+  .slot { min-height:1px; }
+  .note { font-size:12px; color:var(--muted); padding:8px 2px; }
+  .ad { display:flex; flex-direction:column; gap:6px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:10px; }
+  .ad .label { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .ad strong { font-size:15px; } .ad p { margin:0; color:#4a4f57; font-size:14px; }
+  .ad a.cta { align-self:flex-start; padding:6px 10px; border-radius:6px; background:var(--fg); color:#fff; text-decoration:none; font-size:14px; }
+  .ad .domain { font-size:12px; color:var(--muted); }
+  form { position:fixed; left:0; right:0; bottom:0; background:var(--card); border-top:1px solid var(--line); padding:10px 16px 14px; }
+  .bar { max-width:1040px; margin:0 auto; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .chips button { font:inherit; font-size:12px; padding:4px 10px; border:1px solid var(--line); border-radius:99px; background:#fff; cursor:pointer; }
+  .row { display:flex; gap:8px; }
+  textarea { flex:1; font:inherit; padding:9px 12px; border:1px solid #cfd3d8; border-radius:10px; resize:none; height:44px; }
+  .send { font:inherit; padding:0 18px; border:0; border-radius:10px; background:var(--fg); color:#fff; cursor:pointer; }
+  label.dbg { font-size:12px; color:var(--muted); display:inline-flex; gap:4px; align-items:center; margin-left:auto; }
+  @media (max-width: 720px) { .turn { grid-template-columns:1fr; gap:8px; } }
+</style>
+</head>
+<body>
+<header>
+  <b>Demo Chat</b>
+  <span>Sponsored cards come from your own Aside server. The conversation never leaves this machine.</span>
+  <label class="dbg"><input type="checkbox" id="debug" checked> show why no ad</label>
+</header>
+<main id="log" aria-live="polite"></main>
+<form id="f">
+  <div class="bar">
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <textarea id="q" placeholder="Ask anything" aria-label="Message"></textarea>
+      <button class="send" type="submit">Send</button>
+    </div>
+  </div>
+</form>
+<script>
+const SUGGESTIONS = [
+  "My Postgres queries got slow after the table grew to 10M rows. How do I find the problem?",
+  "How do I speed up my GitHub Actions builds? They take 20 minutes.",
+  "Give me a recipe for sourdough bread",
+  "Planning a trip to Japan next month, what should I pack?",
+  "What is the capital of Australia?",
+  "I don't want to live anymore",
+];
+const log = document.getElementById("log");
+const q = document.getElementById("q");
+const messages = [];
+let sessionId = "";
+try { sessionId = localStorage.getItem("aside-demo-session") || ""; } catch (e) {}
+if (!sessionId) {
+  sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+  try { localStorage.setItem("aside-demo-session", sessionId); } catch (e) {}
+}
+
+for (const s of SUGGESTIONS) {
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = s.length > 46 ? s.slice(0, 44) + "..." : s; b.title = s;
+  b.onclick = () => send(s);
+  document.getElementById("chips").appendChild(b);
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function addTurn(role, text) {
+  const turn = el("div", "turn " + role);
+  const bubble = el("div", "bubble", text);
+  const slot = el("aside", "slot");
+  turn.append(bubble, slot);
+  log.appendChild(turn);
+  window.scrollTo(0, document.body.scrollHeight);
+  return { bubble, slot };
+}
+
+// The ad is rendered in its own column, next to the answer. It is never inserted into the answer text.
+function renderAd(slot, ad) {
+  const card = el("div", "ad");
+  card.setAttribute("aria-label", "Sponsored: " + ad.advertiser);
+  card.append(el("span", "label", ad.label));
+  card.append(el("strong", "", ad.headline));
+  if (ad.body) card.append(el("p", "", ad.body));
+  const a = el("a", "cta", ad.cta);
+  a.href = ad.url; a.target = "_blank"; a.rel = "sponsored noopener";
+  card.append(a);
+  card.append(el("span", "domain", ad.advertiser + " · " + ad.display_url));
+  slot.append(card);
+  // Count the impression once the card is at least half visible.
+  let sent = false;
+  const io = new IntersectionObserver((entries) => {
+    if (!sent && entries.some((e) => e.isIntersecting)) {
+      sent = true; io.disconnect();
+      if (!(navigator.sendBeacon && navigator.sendBeacon(ad.impression_url))) {
+        fetch(ad.impression_url, { method: "POST", mode: "no-cors", keepalive: true });
+      }
+    }
+  }, { threshold: 0.5 });
+  io.observe(card);
+}
+
+async function send(text) {
+  text = (text || "").trim();
+  if (!text) return;
+  q.value = "";
+  addTurn("user", text);
+  messages.push({ role: "user", content: text });
+  const { bubble, slot } = addTurn("assistant", "...");
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: messages.slice(-12), session_id: sessionId }),
+    });
+    const data = await r.json();
+    bubble.textContent = data.answer;
+    messages.push({ role: "assistant", content: data.answer });
+    if (data.sponsored) renderAd(slot, data.sponsored);
+    else if (document.getElementById("debug").checked) slot.append(el("div", "note", "No sponsored card: " + (data.ad_reason || "none")));
+  } catch (e) {
+    bubble.textContent = "Error: " + e;
+  }
+}
+
+document.getElementById("f").addEventListener("submit", (e) => { e.preventDefault(); send(q.value); });
+q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(q.value); } });
+</script>
+</body>
+</html>

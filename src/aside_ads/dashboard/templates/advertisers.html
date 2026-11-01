@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Advertisers{% endblock %}
+{% block content %}
+<h1>Advertisers</h1>
+<table>
+  <thead><tr><th>Name</th><th>Website</th><th>Id</th></tr></thead>
+  <tbody>
+  {% for a in advertisers %}<tr><td>{{ a.name }}</td><td>{{ a.website or "" }}</td><td class="mono">{{ a.id }}</td></tr>
+  {% else %}<tr><td colspan="3" class="muted">None yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+<form method="post" class="card">
+  <h2>Add advertiser</h2>
+  <div class="grid">
+    <label>Name <input name="name" required maxlength="200"></label>
+    <label>Website <input name="website" type="url"></label>
+  </div>
+  <button>Add advertiser</button>
+</form>
+<p class="muted">For conversion postbacks, create an advertiser key on the <a href="/dashboard/publishers">keys page</a>.</p>
+{% endblock %}
