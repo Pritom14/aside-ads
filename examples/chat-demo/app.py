@@ -44,7 +44,12 @@ except ImportError:  # running from a checkout without installing the SDK
 
 def _load_env() -> dict[str, str]:
     values: dict[str, str] = {}
-    for path in (Path(os.environ.get("ASIDE_DEMO_ENV", ".aside/demo.env")), REPO / ".aside" / "demo.env"):
+    # Same lookup order as `aside seed-demo` writes: an explicit file, then the server's data dir.
+    candidates = [Path(p) for p in (os.environ.get("ASIDE_DEMO_ENV"),) if p]
+    if os.environ.get("ASIDE_DATA_DIR"):
+        candidates.append(Path(os.environ["ASIDE_DATA_DIR"]) / "demo.env")
+    candidates += [Path(".aside/demo.env"), REPO / ".aside" / "demo.env"]
+    for path in candidates:
         if path.exists():
             for line in path.read_text().splitlines():
                 if "=" in line and not line.startswith("#"):
