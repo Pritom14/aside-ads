@@ -14,13 +14,13 @@ aside = AsideClient("http://127.0.0.1:8000", api_key="aside_pub_...")
 
 ad = aside.get_sponsored(
     context=[{"role": "user", "content": "my postgres queries are slow"}],
-    user_id=session_id,          # optional, hashed by the server, used for frequency caps
+    user_id=session_id,  # optional, hashed by the server, used for frequency caps
     placement="chat-sidebar",
 )
 if ad:
     # Render BESIDE the model's answer, never inside it:
     # ad.label ("Sponsored"), ad.headline, ad.body, ad.cta, link to ad.url (signed click URL)
-    aside.track_impression(ad)   # server-side; or let the browser fetch ad.impression_url
+    aside.track_impression(ad)  # server-side; or let the browser fetch ad.impression_url
 ```
 
 Behaviour:
