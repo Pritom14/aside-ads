@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aside-ads-client"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Python client for Aside, the self-hosted ad server for AI chat apps."
 readme = "README.md"
 license = "MIT"
@@ -14,7 +14,16 @@ authors = [{ name = "Pritom Mazumdar" }]
 dependencies = []
 
 [project.urls]
+Homepage = "https://github.com/Pritom14/aside-ads"
 Repository = "https://github.com/Pritom14/aside-ads"
+Issues = "https://github.com/Pritom14/aside-ads/issues"
+Changelog = "https://github.com/Pritom14/aside-ads/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "src/aside_ads_client/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aside_ads_client"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

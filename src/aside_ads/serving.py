@@ -1,4 +1,4 @@
-"""Ad selection: sensitive guard -> hard filters -> relevance -> auction -> frequency cap.
+"""Ad selection: sensitive guard -> hard filters -> relevance -> auction -> frequency cap -> reservation.
 
 Privacy: the conversation text is wrapped in a ``ContextAnalysis`` that exists
 only for the duration of this call. Nothing derived from it (text, tokens,
@@ -21,6 +21,7 @@ from aside_ads.auction import Candidate, clearing_price, impression_cost, predic
 from aside_ads.matching import AdDoc, ContextAnalysis
 from aside_ads.models import Campaign, Creative, Placement, new_id
 from aside_ads.pacing import budget_allows, day_fraction, pacing_allows
+from aside_ads.reservations import hold_for, outstanding_by_campaign, purge_expired, reserve
 from aside_ads.runtime import Runtime
 from aside_ads.schemas import ServeRequest, ServeResponse, SponsoredAd
 from aside_ads.targeting import (
@@ -87,6 +88,7 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
             .scalars()
             .all()
         )
+        held = await outstanding_by_campaign(s, now)
 
     if req.sensitive:
         return ServeResponse(request_id=request_id, ad=None, reason="sensitive_context")
@@ -95,7 +97,10 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
     frac = day_fraction(now, rt.tz)
 
     def static_ok(c: Campaign) -> bool:
-        spend_today = c.spend_today_micros if c.spend_day == day else 0
+        # Outstanding reservations count as spend. This read only filters; reserve() below
+        # re-checks under a lock before an ad is returned.
+        reserved = held.get(c.id, 0)
+        spend_today = (c.spend_today_micros if c.spend_day == day else 0) + reserved
         return (
             any(cr.status == "active" for cr in c.creatives)
             and placement_allows(c, placement.key)
@@ -111,7 +116,7 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
                 unit_cost_micros=_unit_cost(c),
                 spend_today_micros=spend_today,
                 daily_budget_micros=c.daily_budget_micros,
-                spend_total_micros=c.spend_total_micros,
+                spend_total_micros=c.spend_total_micros + reserved,
                 total_budget_micros=c.total_budget_micros,
             )
             and pacing_allows(spend_today, c.daily_budget_micros, frac, settings.pacing_buffer, c.pacing)
@@ -162,6 +167,8 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
     if not ranked:
         return ServeResponse(request_id=request_id, ad=None, reason="below_floor")
 
+    await purge_expired(rt)  # at most once a minute; expired rows already stop counting
+    no_ad_reason = "frequency_capped"
     for i, cand in enumerate(ranked):
         c: Campaign = cand.payload
         # Increment-then-check makes the cap strict under concurrent requests.
@@ -172,6 +179,17 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
         ):
             continue
         placed = clearing_price(ranked, i, floor)
+        unit = impression_cost(placed.price_micros) if c.bid_type == "cpm" else placed.price_micros
+        hold = hold_for(rt, c.bid_type, placed.price_micros, unit)
+        if (
+            hold is not None
+            and (c.daily_budget_micros is not None or c.total_budget_micros is not None)
+            and not await reserve(
+                rt, c, request_id, hold_micros=hold[0], full_unit_micros=unit, ttl_seconds=hold[1]
+            )
+        ):
+            no_ad_reason = "budget_exhausted"
+            continue
         creative = random.choice([cr for cr in c.creatives if cr.status == "active"])
         claims = {
             "r": request_id,
@@ -204,4 +222,4 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
             relevance=round(cand.relevance, 4),
         )
         return ServeResponse(request_id=request_id, ad=ad)
-    return ServeResponse(request_id=request_id, ad=None, reason="frequency_capped")
+    return ServeResponse(request_id=request_id, ad=None, reason=no_ad_reason)

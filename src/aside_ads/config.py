@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     default_ctr: float = 0.01
     pacing_buffer: float = 1 / 24
     timezone: str = "UTC"
+    # Budget reservations (see aside_ads.reservations). A served CPM ad holds its impression
+    # cost for reservation_ttl seconds; a served CPC ad holds bid x cpc_expected_ctr for
+    # cpc_exposure_ttl seconds. Set a TTL to 0 to turn that hold off.
+    reservation_ttl: int = 120
+    cpc_expected_ctr: float = Field(default=0.05, ge=0.0, le=1.0)
+    cpc_exposure_ttl: int = 900
 
     # Tracking ----------------------------------------------------------------
     impression_token_ttl: int = 3600

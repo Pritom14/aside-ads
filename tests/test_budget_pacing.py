@@ -1,4 +1,7 @@
-"""Budgets, atomic spend accounting under concurrency, pacing and frequency caps."""
+"""Budgets, reservations, atomic spend accounting under concurrency, pacing and frequency caps.
+
+These tests run on SQLite by default and on PostgreSQL when ASIDE_TEST_DATABASE_URL is set.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +11,9 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 
-from aside_ads.models import Campaign, Event
+from aside_ads.models import BudgetReservation, Campaign, Event
 from aside_ads.pacing import pacing_allows
+from aside_ads.reservations import hold_for, purge_expired
 from tests.conftest import build_world, make_settings
 
 DB_TEXT = "slow postgres queries\ndatabase indexing"
@@ -28,6 +32,26 @@ async def _billed(world, kind: str) -> int:  # type: ignore[no-untyped-def]
         ).scalar_one()
 
 
+async def _held(world) -> tuple[int, int]:  # type: ignore[no-untyped-def]
+    """(rows, micros) of unexpired reservations."""
+    now = world.rt.now()
+    async with world.rt.sessionmaker() as s:
+        rows, total = (
+            await s.execute(
+                select(func.count(), func.coalesce(func.sum(BudgetReservation.cost_micros), 0)).where(
+                    BudgetReservation.expires_at > now
+                )
+            )
+        ).one()
+        return int(rows), int(total)
+
+
+def _frozen_clock(world):  # type: ignore[no-untyped-def]
+    clock = {"now": world.rt.now()}
+    world.rt.clock = lambda: clock["now"]
+    return clock
+
+
 async def test_no_overspend_under_concurrent_serves_and_impressions(world) -> None:  # type: ignore[no-untyped-def]
     # Bid = floor, so each impression costs exactly 0.10 CPM = 100 micros. Budget fits 10 impressions.
     cid = await world.campaign("DB", DB_TEXT, bid="0.10", daily_budget=Decimal("0.001"))
@@ -44,10 +68,134 @@ async def test_no_overspend_under_concurrent_serves_and_impressions(world) -> No
     assert c.spend_total_micros == 1_000  # exactly the budget, never more
     assert c.spend_today_micros == 1_000
     assert await _billed(world, "impression") == 10
-    assert results.count("counted") >= 10
+    assert results.count("counted") == 10  # reservations: no unbilled ads were served
     # Exhausted: stop serving.
     after = await world.serve(DB_CONTEXT)
     assert after["ad"] is None and after["reason"] == "no_eligible_campaigns"
+
+
+async def test_concurrent_serve_burst_delivers_only_what_the_budget_pays_for(world) -> None:  # type: ignore[no-untyped-def]
+    # 60 concurrent serves against a budget of 10 impressions (100 micros each). Before
+    # reservations all 60 were served and only 10 billed.
+    cid = await world.campaign("DB", DB_TEXT, bid="0.10", daily_budget=Decimal("0.001"))
+    outs = await asyncio.gather(*(world.serve(DB_CONTEXT) for _ in range(60)))
+    ads = [o["ad"] for o in outs if o["ad"]]
+    assert len(ads) == 10
+    assert {o["reason"] for o in outs if not o["ad"]} <= {"budget_exhausted", "no_eligible_campaigns"}
+    assert await _held(world) == (10, 1_000)
+    rs = await asyncio.gather(*(world.impression(ad) for ad in ads))
+    assert [r.headers["x-aside-status"] for r in rs] == ["counted"] * 10
+    assert await _billed(world, "impression") == 10  # every served ad was billed
+    assert (await _campaign(world, cid)).spend_total_micros == 1_000
+    assert await _held(world) == (0, 0)  # each reservation converted into spend
+
+
+async def test_expired_reservations_release_budget(world) -> None:  # type: ignore[no-untyped-def]
+    clock = _frozen_clock(world)
+    await world.campaign("DB", DB_TEXT, bid="0.10", daily_budget=Decimal("0.001"))
+    ads = [(await world.serve(DB_CONTEXT))["ad"] for _ in range(10)]
+    assert all(ads)
+    blocked = await world.serve(DB_CONTEXT)
+    assert blocked["ad"] is None and blocked["reason"] == "no_eligible_campaigns"
+    clock["now"] += timedelta(seconds=world.rt.settings.reservation_ttl - 1)
+    assert (await world.serve(DB_CONTEXT))["ad"] is None  # still held
+    clock["now"] += timedelta(seconds=2)
+    assert (await world.serve(DB_CONTEXT))["ad"] is not None  # released by expiry
+    await purge_expired(world.rt, force=True)
+    async with world.rt.sessionmaker() as s:
+        assert (await s.execute(select(func.count()).select_from(BudgetReservation))).scalar_one() == 1
+
+
+async def test_late_impression_is_dropped_when_budget_is_held_by_others(world) -> None:  # type: ignore[no-untyped-def]
+    clock = _frozen_clock(world)
+    cid = await world.campaign("DB", DB_TEXT, bid="0.10", daily_budget=Decimal("0.001"))
+    stale = [(await world.serve(DB_CONTEXT))["ad"] for _ in range(10)]
+    clock["now"] += timedelta(seconds=world.rt.settings.reservation_ttl + 1)
+    fresh = [(await world.serve(DB_CONTEXT))["ad"] for _ in range(10)]
+    assert all(stale) and all(fresh)
+    # Impressions for the expired reservations arrive late: recorded, but not billed,
+    # because the whole budget is now held for the fresh ads.
+    late = [
+        (
+            await world.client.post(
+                "/v1/impressions", json={"token": ad["impression_url"]}, headers=world.pub_headers
+            )
+        ).json()
+        for ad in stale
+    ]
+    assert late == [{"status": "counted", "billed": False}] * 10
+    on_time = [
+        (
+            await world.client.post(
+                "/v1/impressions", json={"token": ad["impression_url"]}, headers=world.pub_headers
+            )
+        ).json()
+        for ad in fresh
+    ]
+    assert on_time == [{"status": "counted", "billed": True}] * 10
+    # Replays never bill twice.
+    again = await world.client.post(
+        "/v1/impressions", json={"token": stale[0]["impression_url"]}, headers=world.pub_headers
+    )
+    assert again.json() == {"status": "duplicate", "billed": False}
+    c = await _campaign(world, cid)
+    assert c.spend_total_micros == 1_000 and c.impressions_total == 20
+    assert await _billed(world, "impression") == 10
+
+
+async def test_late_impression_is_billed_when_budget_allows(world) -> None:  # type: ignore[no-untyped-def]
+    clock = _frozen_clock(world)
+    cid = await world.campaign("DB", DB_TEXT, bid="0.10", daily_budget=Decimal("0.001"))
+    ad = (await world.serve(DB_CONTEXT))["ad"]
+    clock["now"] += timedelta(seconds=world.rt.settings.reservation_ttl + 1)
+    r = await world.impression(ad)
+    assert r.headers["x-aside-status"] == "counted"
+    assert await _billed(world, "impression") == 1
+    assert (await _campaign(world, cid)).spend_total_micros == 100
+    assert await _held(world) == (0, 0)
+
+
+async def test_cpc_exposure_bounds_serving_and_free_clicks(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    # Expected CTR 25%: each CPC serve holds 0.25 x 10_000 = 2_500 micros. Budget 50_000:
+    # a serve needs existing holds + one full click (10_000) to fit, so 17 serves at most.
+    w, rt = await build_world(make_settings(tmp_path, cpc_expected_ctr=0.25))
+    clock = _frozen_clock(w)
+    try:
+        cid = await w.campaign("DB", DB_TEXT, bid_type="cpc", bid="0.01", total_budget=Decimal("0.05"))
+        outs = await asyncio.gather(*(w.serve(DB_CONTEXT) for _ in range(30)))
+        ads = [o["ad"] for o in outs if o["ad"]]
+        assert len(ads) == 17
+        assert await _held(w) == (17, 42_500)
+        # Three clicks convert their holds into full-price spend.
+        for ad in ads[:3]:
+            assert (await w.click(ad)).headers["x-aside-status"] == "counted"
+        assert (await _campaign(w, cid)).spend_total_micros == 30_000
+        assert await _held(w) == (14, 35_000)
+        assert (await w.serve(DB_CONTEXT))["ad"] is None  # 30_000 + 35_000 + 10_000 > 50_000
+        # Exposure expires, freeing room to serve again.
+        clock["now"] += timedelta(seconds=rt.settings.cpc_exposure_ttl + 1)
+        assert (await w.serve(DB_CONTEXT))["ad"] is not None
+        # Clicks beyond the estimate are bounded: the budget is never exceeded.
+        await asyncio.gather(*(w.click(ad) for ad in ads[3:]))
+        c = await _campaign(w, cid)
+        assert c.spend_total_micros == 50_000 and c.clicks_total == 17
+        assert await _billed(w, "click") == 5
+    finally:
+        await w.client.aclose()
+        await rt.close()
+
+
+def test_hold_sizes(settings_factory) -> None:  # type: ignore[no-untyped-def]
+    class _Rt:
+        settings = settings_factory()
+
+    rt = _Rt()
+    assert hold_for(rt, "cpm", 2_000_000, 2_000) == (2_000, 120)  # type: ignore[arg-type]
+    assert hold_for(rt, "cpc", 10_000, 10_000) == (500, 900)  # type: ignore[arg-type]
+    assert hold_for(rt, "cpc", 1, 1) == (1, 900)  # type: ignore[arg-type]
+    rt.settings = settings_factory(reservation_ttl=0, cpc_expected_ctr=0.0)
+    assert hold_for(rt, "cpm", 2_000_000, 2_000) is None  # type: ignore[arg-type]
+    assert hold_for(rt, "cpc", 10_000, 10_000) is None  # type: ignore[arg-type]
 
 
 async def test_lifetime_budget_caps_concurrent_clicks(world) -> None:  # type: ignore[no-untyped-def]

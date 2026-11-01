@@ -46,6 +46,7 @@ class Runtime:
         self.topics: CategoryClassifier = build_topic_classifier(matcher, settings.topic_threshold)
         self.rate_limiter = RateLimiter(counters, settings.rate_limit_per_minute)
         self.clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
+        self.last_reservation_purge = 0.0  # monotonic time of the last expired-reservation purge
 
     @property
     def relevance_threshold(self) -> float:

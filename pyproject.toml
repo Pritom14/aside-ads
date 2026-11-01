@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aside-ads"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Self-hosted ad server for AI chat apps. Conversations never leave your server."
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -42,10 +42,19 @@ dev = ["pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27", "ruff>=0.5"]
 aside = "aside_ads.cli:main"
 
 [project.urls]
+Homepage = "https://github.com/Pritom14/aside-ads"
 Repository = "https://github.com/Pritom14/aside-ads"
+Issues = "https://github.com/Pritom14/aside-ads/issues"
+Changelog = "https://github.com/Pritom14/aside-ads/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "src/aside_ads/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aside_ads"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src/aside_ads", "/tests", "/alembic.ini", "/.env.example", "/README.md", "/LICENSE"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -57,7 +66,6 @@ filterwarnings = ["ignore::DeprecationWarning:fastembed.*"]
 [tool.ruff]
 line-length = 110
 target-version = "py310"
-extend-exclude = ["docs/archive"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

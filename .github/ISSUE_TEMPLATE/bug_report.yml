@@ -1,0 +1,34 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security issues, use private reporting instead: see SECURITY.md.
+        Please do not paste real conversation text, API keys or user ids.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Commands, requests or a minimal script. Logs help.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `aside version`, or the SDK version.
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: "OS, Python or Node version, SQLite or PostgreSQL, Redis or not, matcher (embedding or bm25)."

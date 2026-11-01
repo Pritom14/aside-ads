@@ -1,6 +1,17 @@
+"""Shared fixtures.
+
+Tests use a fresh SQLite database per test by default. Set ASIDE_TEST_DATABASE_URL
+(for example ``postgresql+asyncpg://aside:aside@127.0.0.1:5432/aside_test``) to run
+the same tests against PostgreSQL: the schema is rebuilt with the Alembic
+migrations once per session and every table is truncated before each test.
+The database is wiped, so never point it at real data.
+"""
+
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import asyncio
+import os
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -12,7 +23,7 @@ from aside_ads.app import create_app
 from aside_ads.auth import create_api_key
 from aside_ads.config import Settings
 from aside_ads.matching.bm25 import BM25Matcher
-from aside_ads.models import Advertiser
+from aside_ads.models import Advertiser, Base
 from aside_ads.runtime import Runtime
 from aside_ads.schemas import CampaignIn, CreativeIn
 from aside_ads.services import add_creative, add_placement, create_campaign, create_publisher
@@ -23,10 +34,13 @@ BROWSER_UA = (
 )
 
 
+TEST_DATABASE_URL = os.environ.get("ASIDE_TEST_DATABASE_URL") or None
+
+
 def make_settings(tmp_path: Any, **overrides: Any) -> Settings:
     base: dict[str, Any] = {
         "data_dir": tmp_path,
-        "database_url": f"sqlite+aiosqlite:///{tmp_path}/test.db",
+        "database_url": TEST_DATABASE_URL or f"sqlite+aiosqlite:///{tmp_path}/test.db",
         "redis_url": None,
         "secret_key": "test-secret-key",
         "matcher": "bm25",
@@ -136,3 +150,36 @@ def settings_factory(tmp_path: Any):  # type: ignore[no-untyped-def]
         return make_settings(tmp_path, **overrides)
 
     return make
+
+
+async def _reset_postgres(url: str, *, drop: bool) -> None:
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    engine = create_async_engine(Settings(_env_file=None, database_url=url).resolved_database_url)
+    try:
+        async with engine.begin() as conn:
+            if drop:
+                await conn.execute(text("DROP SCHEMA public CASCADE"))
+                await conn.execute(text("CREATE SCHEMA public"))
+            else:
+                names = ", ".join(t.name for t in Base.metadata.sorted_tables)
+                await conn.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def _postgres_schema() -> Iterator[None]:
+    if TEST_DATABASE_URL:
+        from aside_ads.cli import run_migrations
+
+        asyncio.run(_reset_postgres(TEST_DATABASE_URL, drop=True))
+        run_migrations(Settings(_env_file=None, database_url=TEST_DATABASE_URL))
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _clean_database(_postgres_schema: None) -> None:
+    if TEST_DATABASE_URL:
+        asyncio.run(_reset_postgres(TEST_DATABASE_URL, drop=False))
