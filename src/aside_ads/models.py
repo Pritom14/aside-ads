@@ -22,6 +22,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -192,6 +193,25 @@ class Event(Base):
     country: Mapped[str | None] = mapped_column(String(2))
     region: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class BudgetReservation(Base):
+    """Budget held for a served ad until it is billed or the hold expires.
+
+    One row per served ad (keyed by request id) for campaigns with a budget. CPM
+    rows hold the impression cost; CPC rows hold the expected click cost (bid x
+    ``ASIDE_CPC_EXPECTED_CTR``). Expired rows no longer count and are purged
+    lazily. See ``aside_ads.reservations``.
+    """
+
+    __tablename__ = "budget_reservations"
+    __table_args__ = (Index("ix_budget_reservations_campaign_expires", "campaign_id", "expires_at"),)
+
+    request_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    campaign_id: Mapped[str] = mapped_column(String(32))
+    kind: Mapped[str] = mapped_column(String(3))  # cpm | cpc
+    cost_micros: Mapped[int] = mapped_column(BigInteger)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class Conversion(Base):

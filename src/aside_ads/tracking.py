@@ -5,10 +5,11 @@ Integrity rules:
 * Each (kind, request_id) is recorded at most once: a unique constraint plus
   ``INSERT ... ON CONFLICT DO NOTHING`` makes duplicates and concurrent retries no-ops.
 * Charging is a single conditional ``UPDATE`` on the campaign row that only
-  succeeds if the cost still fits in both the daily and lifetime budgets. On
-  SQLite writers are serialized; on PostgreSQL the row lock plus re-check of the
-  WHERE clause gives the same guarantee. Spend can therefore never exceed a budget,
-  no matter how many requests race.
+  succeeds if the cost, plus the other outstanding CPM reservations, still
+  fits in both the daily and lifetime budgets. The transaction locks the campaign
+  row before it reads the reservations (see ``aside_ads.reservations``). Spend can
+  therefore never exceed a budget, no matter how many requests race, and an event
+  whose reservation expired cannot take budget already held for other served ads.
 * Conversions are unique on (click_id, idempotency_key).
 """
 
@@ -23,6 +24,7 @@ from sqlalchemy import case, or_, select, update
 from aside_ads.auction import impression_cost
 from aside_ads.db import insert_for
 from aside_ads.models import Campaign, Conversion, DailyStat, Event
+from aside_ads.reservations import outstanding, take
 from aside_ads.runtime import Runtime
 from aside_ads.targeting import as_utc
 
@@ -34,17 +36,19 @@ class TrackOutcome:
     cost_micros: int = 0
 
 
-def charge_statement(campaign_id: str, cost: int, day: str) -> Any:
+def charge_statement(campaign_id: str, cost: int, day: str, reserved: int = 0) -> Any:
+    """Add ``cost`` to spend only if spend + cost + ``reserved`` fits both budgets."""
     today_spend = case((Campaign.spend_day == day, Campaign.spend_today_micros), else_=0)
+    need = cost + reserved
     return (
         update(Campaign)
         .where(
             Campaign.id == campaign_id,
             or_(
                 Campaign.total_budget_micros.is_(None),
-                Campaign.spend_total_micros + cost <= Campaign.total_budget_micros,
+                Campaign.spend_total_micros + need <= Campaign.total_budget_micros,
             ),
-            or_(Campaign.daily_budget_micros.is_(None), today_spend + cost <= Campaign.daily_budget_micros),
+            or_(Campaign.daily_budget_micros.is_(None), today_spend + need <= Campaign.daily_budget_micros),
         )
         .values(
             spend_total_micros=Campaign.spend_total_micros + cost,
@@ -99,16 +103,8 @@ async def record_event(rt: Runtime, kind: str, claims: dict[str, Any]) -> TrackO
         if (await s.execute(ins)).rowcount == 0:
             return TrackOutcome("duplicate")
 
-        billed = False
-        if cost > 0:
-            billed = (await s.execute(charge_statement(campaign_id, cost, day))).rowcount == 1
-            if billed:
-                await s.execute(
-                    update(Event)
-                    .where(Event.kind == kind, Event.request_id == claims["r"])
-                    .values(billed=True, cost_micros=cost)
-                    .execution_options(synchronize_session=False)
-                )
+        # Writing the campaign row next takes its lock (PostgreSQL), so the reservation
+        # total read below is complete: every reserve() for this campaign locks it first.
         counter = Campaign.impressions_total if kind == "impression" else Campaign.clicks_total
         await s.execute(
             update(Campaign)
@@ -116,6 +112,22 @@ async def record_event(rt: Runtime, kind: str, claims: dict[str, Any]) -> TrackO
             .values({counter: counter + 1})
             .execution_options(synchronize_session=False)
         )
+        billed = False
+        if cost > 0:
+            # Convert this ad's reservation (if any) into spend. A live CPM reservation already
+            # made room for the cost; an expired one did not, so a late event is billed only if
+            # it still fits next to the other outstanding CPM reservations. CPC holds are
+            # estimates and never block a real click.
+            await take(s, claims["r"])
+            others = await outstanding(s, campaign_id, now, kind="cpm")
+            billed = (await s.execute(charge_statement(campaign_id, cost, day, others))).rowcount == 1
+            if billed:
+                await s.execute(
+                    update(Event)
+                    .where(Event.kind == kind, Event.request_id == claims["r"])
+                    .values(billed=True, cost_micros=cost)
+                    .execution_options(synchronize_session=False)
+                )
         incs = {"impressions" if kind == "impression" else "clicks": 1, "spend_micros": cost if billed else 0}
         await s.execute(_daily_upsert(s, campaign_id, day, **incs))
     return TrackOutcome("counted", billed, cost if billed else 0)

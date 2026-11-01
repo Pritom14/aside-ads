@@ -158,12 +158,31 @@ needed to beat the runner-up, never below the floor (`ASIDE_FLOOR_CPM` or per pl
 bid. Campaigns can include or exclude keywords and topic categories, and target countries, regions, a
 radius around a point, placements, dates, weekdays and hours.
 
-**Budgets and pacing.** Daily and lifetime budgets are stored in integer micros. Every charge is one
-conditional `UPDATE` on the campaign row that only succeeds if the cost still fits both budgets, so spend
-cannot exceed a budget however many requests race (tested with concurrent serves, impressions and clicks on
-SQLite, and checked against PostgreSQL). Even pacing holds a campaign back when today's spend is ahead of
-`daily_budget x (fraction of day elapsed + buffer)`. Frequency caps count serves per hashed user id with an
-atomic increment-then-check. CPM is billed per counted impression, CPC per counted click.
+**Budgets and pacing.** Daily and lifetime budgets are stored in integer micros. CPM is billed per counted
+impression, CPC per counted click. Every charge is one conditional `UPDATE` on the locked campaign row that
+only succeeds if the cost still fits both budgets, so spend cannot exceed a budget however many requests race
+(tested with concurrent serves, impressions and clicks on SQLite and PostgreSQL). Even pacing holds a
+campaign back when today's spend is ahead of `daily_budget x (fraction of day elapsed + buffer)`. Frequency
+caps count serves per hashed user id with an atomic increment-then-check.
+
+**Budget reservations.** Ads are chosen at serve time but billed later, so without a hold a burst of
+concurrent serves could deliver more ads than the budget pays for. When a CPM ad wins, its impression cost
+is reserved atomically before the ad is returned. The impression converts the reservation into spend; with
+no impression the reservation expires after `ASIDE_RESERVATION_TTL` seconds (default 120). Budget and pacing
+checks count outstanding reservations, so 60 concurrent serves against a 10-impression budget deliver 10
+ads, and all 10 are billed. An impression that arrives after its reservation expired is billed if the
+budget still has room next to the other outstanding reservations, and recorded but not billed otherwise.
+Nothing is billed twice.
+
+CPC needs a different rule: holding a full click price per serve would stop delivery after a handful of
+serves, since most ads are never clicked. Each CPC serve instead holds an expected cost, bid x
+`ASIDE_CPC_EXPECTED_CTR` (default 0.05), for `ASIDE_CPC_EXPOSURE_TTL` seconds (default 900), and the
+campaign stops serving while spend plus outstanding holds plus one full click would exceed the budget. The
+click converts its hold into the full price. The trade-off: this bounds free clicks but does not eliminate
+them. If outstanding ads are clicked at a higher rate than the estimate, or a click arrives after its hold
+expired and the budget is gone, the user is still redirected but the click is not billed. A higher expected
+CTR or TTL gives fewer free clicks and stops a little earlier near the end of a budget. Set a TTL to 0 to turn
+that hold off. Details: [`src/aside_ads/reservations.py`](src/aside_ads/reservations.py).
 
 **Tracking.** Impression and click URLs carry HMAC-signed tokens (kind, ids, request id, clearing price,
 expiry). Tampered tokens are rejected. Each request id counts at most one impression and one click.
@@ -233,8 +252,6 @@ to build, direct relationships, or cannot send chats to a third party.
 
 ## Roadmap
 
-- Budget reservation at serve time, so bursts of concurrent serves cannot deliver unbilled impressions
-  (today they cannot overspend, but can over-deliver for free).
 - Fill-rate and request reporting per placement.
 - Multilingual defaults and per-language thresholds; more sensitive-term packs.
 - More creative formats (image cards, product cards) and CTR-based creative rotation.
