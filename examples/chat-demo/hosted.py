@@ -66,6 +66,8 @@ def _public_url(port: int) -> str:
         return f"https://{os.environ['FLY_APP_NAME']}.fly.dev"
     if os.environ.get("SPACE_HOST"):  # set by Hugging Face Spaces
         return f"https://{os.environ['SPACE_HOST']}"
+    if os.environ.get("RENDER_EXTERNAL_URL"):  # set by Render web services
+        return os.environ["RENDER_EXTERNAL_URL"].rstrip("/")
     return f"http://localhost:{port}"
 
 

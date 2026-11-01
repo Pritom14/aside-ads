@@ -1,0 +1,16 @@
+# Render Blueprint for the hosted Aside demo (Rasoi AI cooking scenario).
+# Render dashboard: New > Blueprint > pick this repository > Apply.
+services:
+  - type: web
+    name: aside-demo
+    runtime: docker
+    # starter stays on; free sleeps after 15 idle minutes and takes about a minute to wake
+    plan: starter
+    region: singapore
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ASIDE_DEMO_SCENARIO
+        value: cooking
