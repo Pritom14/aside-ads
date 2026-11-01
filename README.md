@@ -269,8 +269,7 @@ ruff check . && ruff format --check .
 cd sdks/js && npm install && npx tsc --noEmit
 ```
 
-Layout: `src/aside_ads` (server), `sdks/python`, `sdks/js`, `examples/chat-demo`, `examples/react`,
-`docs/archive` (earlier strategy notes).
+Layout: `src/aside_ads` (server), `sdks/python`, `sdks/js`, `examples/chat-demo`, `examples/react`.
 
 ## License
 
