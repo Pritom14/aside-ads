@@ -31,6 +31,12 @@
   .send { font:inherit; padding:0 18px; border:0; border-radius:10px; background:var(--fg); color:#fff; cursor:pointer; }
   label.dbg { font-size:12px; color:var(--muted); display:inline-flex; gap:4px; align-items:center; margin-left:auto; }
   @media (max-width: 720px) { .turn { grid-template-columns:1fr; gap:8px; } }
+  /* The sponsored card eases in beside the answer; the "why no ad" note fades in. */
+  @keyframes aside-in { from { opacity:0; transform:translateX(18px); } to { opacity:1; transform:none; } }
+  @keyframes aside-fade { from { opacity:0; } to { opacity:1; } }
+  .ad { animation:aside-in .5s cubic-bezier(.2,.8,.2,1) both; }
+  .note { animation:aside-fade .4s ease both; }
+  @media (prefers-reduced-motion: reduce) { .ad, .note { animation:none; } }
   /* Cooking scenario (Rasoi AI): warmer colors, same layout. */
   body.cooking { --bg:#fbf7f2; --line:#ece3d8; --accent:#b4531c; }
   body.cooking header b { color:var(--accent); }
