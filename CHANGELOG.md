@@ -5,6 +5,18 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). The server (`aside-ads` on PyPI), the Python SDK
 (`aside-ads-client`) and the JS SDK (`aside-ads` on npm) are released together with the same version.
 
+## [Unreleased]
+
+### Demo
+
+- `aside seed-demo --scenario cooking`: "Rasoi AI", a free Indian cooking assistant, with five
+  fictional kitchen and grocery advertisers bidding in INR. `dev` stays the default scenario.
+  `demo.env` records `ASIDE_DEMO_SCENARIO` and `ASIDE_CURRENCY`; the hosted demo reads
+  `ASIDE_DEMO_SCENARIO` too.
+- The chat demo shows the scenario's name, prompts and written answers, eases the sponsored card in
+  beside the answer, and explains a missing card in plain words ("nothing relevant to this message").
+- `seed-demo` no longer reuses a publisher key from another scenario's publisher in the same data dir.
+
 ## [0.1.0] - 2026-11-01
 
 First public release.

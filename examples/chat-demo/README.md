@@ -18,6 +18,12 @@ python examples/chat-demo/app.py   # in a second terminal: http://127.0.0.1:8001
 - After a sensitive message the demo passes `sensitive: true` for the next three turns of that session.
 - Ad clicks go to `/landing/<slug>` on this demo server, which shows the click id an advertiser
   would use for a conversion postback.
+- `aside seed-demo --scenario cooking` (in a fresh `ASIDE_DATA_DIR`) turns the page into "Rasoi AI",
+  a free cooking assistant with cooking prompts, written answers for them, and kitchen and grocery
+  advertisers bidding in INR. The scenario is recorded in `demo.env` (`ASIDE_DEMO_SCENARIO`); start the
+  server with `ASIDE_CURRENCY=INR` so the dashboard labels amounts in rupees. Try "Paneer butter masala
+  for 4 people?" (a grocery card), "My kadhai keeps sticking, how do I fix it?" (cookware) and "Who
+  invented the pressure cooker?" (no card: nothing is relevant enough).
 
 ## Hosted mode
 

@@ -60,6 +60,10 @@ aside serve                          # http://127.0.0.1:8000  (API docs at /docs
 python examples/chat-demo/app.py     # second terminal: http://127.0.0.1:8001
 ```
 
+`aside seed-demo --scenario cooking` seeds a different demo instead: "Rasoi AI", a free Indian cooking
+assistant, with five fictional kitchen and grocery advertisers bidding in INR (start the server with
+`ASIDE_CURRENCY=INR`). Use a separate `ASIDE_DATA_DIR` for each scenario.
+
 No database or Redis to set up: SQLite lives in `./.aside/`. With the `embeddings` extra the first start
 downloads a ~67 MB ONNX model (BAAI/bge-small-en-v1.5) once; without it, or offline, Aside falls back to
 BM25 keyword matching.
