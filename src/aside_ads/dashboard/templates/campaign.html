@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+<div class="row between">
+  <h1>{{ c.name }} <span class="pill {{ c.status }}">{{ c.status }}</span></h1>
+  <span class="muted">{{ c.advertiser.name }} · id {{ c.id }}</span>
+</div>
+{% if request.query_params.get('saved') %}<div class="flash ok">Saved.</div>{% endif %}
+<div class="stats">
+  <div><span>Bid</span><b>{{ c.bid_micros|money }} {{ c.bid_type|upper }}</b></div>
+  <div><span>Spend today</span><b>{{ (c.spend_today_micros if c.spend_day == today else 0)|money }} / {{ c.daily_budget_micros|money }}</b></div>
+  <div><span>Spend total</span><b>{{ c.spend_total_micros|money }} / {{ c.total_budget_micros|money }}</b></div>
+  <div><span>Impressions</span><b>{{ c.impressions_total|num }}</b></div>
+  <div><span>Clicks</span><b>{{ c.clicks_total|num }}</b></div>
+</div>
+
+<h2>Creatives</h2>
+<table>
+  <thead><tr><th>Preview</th><th>URL</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for cr in c.creatives %}
+  <tr>
+    <td><div class="adcard"><span class="label">Sponsored</span><b>{{ cr.headline }}</b><p>{{ cr.body }}</p><span class="cta">{{ cr.cta }}</span></div></td>
+    <td class="url">{{ cr.url }}</td>
+    <td><span class="pill {{ cr.status }}">{{ cr.status }}</span></td>
+    <td><form method="post" action="/dashboard/creatives/{{ cr.id }}/toggle"><button class="small">{{ 'Pause' if cr.status == 'active' else 'Activate' }}</button></form></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<details class="card">
+  <summary>Add creative</summary>
+  <form method="post" action="/dashboard/campaigns/{{ c.id }}/creatives">
+    <div class="grid">
+      <label>Headline <input name="headline" maxlength="90" required></label>
+      <label>Call to action <input name="cta" value="Learn more" maxlength="40" required></label>
+      <label>Landing URL <input name="url" type="url" required></label>
+      <label>Image URL <input name="image_url" type="url"></label>
+    </div>
+    <label>Body <textarea name="body" rows="2" maxlength="300"></textarea></label>
+    <button>Add creative</button>
+  </form>
+</details>
+
+<h2>Last 30 days</h2>
+{% if not rows %}<p class="muted">No traffic yet.</p>{% else %}
+<table>
+  <thead><tr><th>Day</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Conv. value</th><th class="r">Spend</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td>{{ r.day }}</td><td class="r">{{ r.impressions|num }}</td><td class="r">{{ r.clicks|num }}</td><td class="r">{{ r.ctr|pct }}</td>
+    <td class="r">{{ r.conversions|num }}</td><td class="r">{{ "%.2f"|format(r.conversion_value) }}</td><td class="r">{{ "%.2f"|format(r.spend) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>Settings</h2>
+<form method="post" action="/dashboard/campaigns/{{ c.id }}" class="card">
+  {% include "_campaign_fields.html" %}
+  <button>Save changes</button>
+</form>
+{% endblock %}

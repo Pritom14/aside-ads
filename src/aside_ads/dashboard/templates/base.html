@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Aside{% endblock %} · Aside dashboard</title>
+  <link rel="stylesheet" href="/dashboard/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">aside</a>
+    {% if not hide_nav %}
+    <nav>
+      <a href="/dashboard">Overview</a>
+      <a href="/dashboard/campaigns/new">New campaign</a>
+      <a href="/dashboard/advertisers">Advertisers</a>
+      <a href="/dashboard/publishers">Publishers &amp; keys</a>
+    </nav>
+    <form method="post" action="/dashboard/logout" class="inline"><button class="link">Log out</button></form>
+    {% endif %}
+  </header>
+  <main>
+    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    {% if errors %}<div class="flash error"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer>Matcher: {{ matcher }} · Amounts in {{ currency }} · Conversation text is never stored.</footer>
+</body>
+</html>

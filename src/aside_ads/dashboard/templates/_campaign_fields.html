@@ -1,0 +1,64 @@
+<fieldset>
+  <legend>Basics</legend>
+  <div class="grid">
+    <label>Name <input name="name" value="{{ v.name }}" required maxlength="200"></label>
+    <label>Status
+      <select name="status">{% for s in ["active", "paused", "archived"] %}<option {{ 'selected' if v.status == s }}>{{ s }}</option>{% endfor %}</select>
+    </label>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Bid and budget ({{ currency }})</legend>
+  <div class="grid">
+    <label>Bid type
+      <select name="bid_type">
+        <option value="cpc" {{ 'selected' if v.bid_type == 'cpc' }}>CPC (per click)</option>
+        <option value="cpm" {{ 'selected' if v.bid_type == 'cpm' }}>CPM (per 1000 impressions)</option>
+      </select>
+    </label>
+    <label>Max bid <input name="bid" value="{{ v.bid }}" inputmode="decimal" required></label>
+    <label>Daily budget <input name="daily_budget" value="{{ v.daily_budget }}" inputmode="decimal" placeholder="no limit"></label>
+    <label>Lifetime budget <input name="total_budget" value="{{ v.total_budget }}" inputmode="decimal" placeholder="no limit"></label>
+    <label>Pacing
+      <select name="pacing">
+        <option value="even" {{ 'selected' if v.pacing == 'even' }}>Even through the day</option>
+        <option value="asap" {{ 'selected' if v.pacing == 'asap' }}>As fast as possible</option>
+      </select>
+    </label>
+    <label>Frequency cap <input name="freq_cap" value="{{ v.freq_cap }}" inputmode="numeric" placeholder="none"></label>
+    <label>Cap window (hours) <input name="freq_cap_window_hours" value="{{ v.freq_cap_window_hours }}" inputmode="decimal"></label>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Contextual targeting</legend>
+  <label>Conversations this ad fits (one description per line)
+    <textarea name="targeting_text" rows="4" placeholder="slow postgres queries&#10;database indexing and query plans">{{ v.targeting_text }}</textarea>
+  </label>
+  <div class="grid">
+    <label>Min relevance (0 to 1) <input name="min_relevance" value="{{ v.min_relevance }}" placeholder="server default"></label>
+    <label>Require one of these keywords <input name="keywords_include" value="{{ v.keywords_include }}" placeholder="comma separated"></label>
+    <label>Never with these keywords <input name="keywords_exclude" value="{{ v.keywords_exclude }}"></label>
+    <label>Only in categories <input name="categories_include" value="{{ v.categories_include }}" placeholder="e.g. software_development"></label>
+    <label>Never in categories <input name="categories_exclude" value="{{ v.categories_exclude }}" placeholder="e.g. news_politics"></label>
+    <label>Only on placements <input name="placements" value="{{ v.placements }}" placeholder="all"></label>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Geo and schedule (optional)</legend>
+  <div class="grid">
+    <label>Countries (ISO codes) <input name="countries" value="{{ v.countries }}" placeholder="IN, US"></label>
+    <label>Regions <input name="regions" value="{{ v.regions }}" placeholder="KA, MH"></label>
+    <label>Latitude <input name="geo_lat" value="{{ v.geo_lat }}"></label>
+    <label>Longitude <input name="geo_lng" value="{{ v.geo_lng }}"></label>
+    <label>Radius (km) <input name="geo_radius_km" value="{{ v.geo_radius_km }}"></label>
+    <label>Start <input type="datetime-local" name="start_at" value="{{ v.start_at }}"></label>
+    <label>End <input type="datetime-local" name="end_at" value="{{ v.end_at }}"></label>
+    <label>From hour <input name="sched_start_hour" value="{{ v.sched_start_hour }}" placeholder="0-23"></label>
+    <label>To hour <input name="sched_end_hour" value="{{ v.sched_end_hour }}" placeholder="1-24"></label>
+    <label>Schedule timezone <input name="sched_timezone" value="{{ v.sched_timezone }}" placeholder="server default"></label>
+  </div>
+  <div class="days">Days:
+    {% for d in range(7) %}<label class="check"><input type="checkbox" name="sched_days" value="{{ d }}" {{ 'checked' if d in v.sched_days }}> {{ ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][d] }}</label>{% endfor %}
+    <span class="muted">(none checked = every day)</span>
+  </div>
+</fieldset>

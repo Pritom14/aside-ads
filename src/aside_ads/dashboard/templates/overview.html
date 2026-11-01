@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div class="row between">
+  <h1>Overview</h1>
+  <div class="tabs">
+    {% for d in [1, 7, 30, 90] %}<a href="?days={{ d }}" class="{{ 'on' if d == days }}">{{ 'Today' if d == 1 else d ~ ' days' }}</a>{% endfor %}
+  </div>
+</div>
+<div class="stats">
+  <div><span>Impressions</span><b>{{ grand.impressions|num }}</b></div>
+  <div><span>Clicks</span><b>{{ grand.clicks|num }}</b></div>
+  <div><span>CTR</span><b>{{ grand.ctr|pct }}</b></div>
+  <div><span>Spend</span><b>{{ "%.2f"|format(grand.spend) }}</b></div>
+  <div><span>Conversions</span><b>{{ grand.conversions|num }}</b></div>
+</div>
+
+<h2>Campaigns</h2>
+{% if not campaigns %}
+<p class="muted">No campaigns yet. <a href="/dashboard/campaigns/new">Create one</a> or run <code>aside seed-demo</code>.</p>
+{% else %}
+<table>
+  <thead><tr><th>Campaign</th><th>Advertiser</th><th>Status</th><th>Bid</th><th>Daily / total budget</th><th>Spend today</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Spend</th></tr></thead>
+  <tbody>
+  {% for c in campaigns %}{% set t = totals.get(c.id) %}
+    <tr>
+      <td><a href="/dashboard/campaigns/{{ c.id }}">{{ c.name }}</a></td>
+      <td>{{ c.advertiser.name }}</td>
+      <td><span class="pill {{ c.status }}">{{ c.status }}</span></td>
+      <td>{{ c.bid_micros|money }} {{ c.bid_type|upper }}</td>
+      <td>{{ c.daily_budget_micros|money }} / {{ c.total_budget_micros|money }}</td>
+      <td>{{ (c.spend_today_micros if c.spend_day == today else 0)|money }}</td>
+      <td class="r">{{ (t.impressions if t else 0)|num }}</td>
+      <td class="r">{{ (t.clicks if t else 0)|num }}</td>
+      <td class="r">{{ (t.ctr if t else 0)|pct }}</td>
+      <td class="r">{{ (t.conversions if t else 0)|num }}</td>
+      <td class="r">{{ "%.2f"|format(t.spend if t else 0) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>By day</h2>
+{% if not rows %}<p class="muted">No traffic in this period.</p>{% else %}
+<table>
+  <thead><tr><th>Day</th><th>Campaign</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Spend</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr><td>{{ r.day }}</td><td><a href="/dashboard/campaigns/{{ r.campaign_id }}">{{ names.get(r.campaign_id, r.campaign_id) }}</a></td>
+      <td class="r">{{ r.impressions|num }}</td><td class="r">{{ r.clicks|num }}</td><td class="r">{{ r.ctr|pct }}</td>
+      <td class="r">{{ r.conversions|num }}</td><td class="r">{{ "%.2f"|format(r.spend) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

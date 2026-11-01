@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}New campaign{% endblock %}
+{% block content %}
+<h1>New campaign</h1>
+{% if not advertisers %}
+<p class="flash error">Create an <a href="/dashboard/advertisers">advertiser</a> first.</p>
+{% else %}
+<form method="post" class="card">
+  <label>Advertiser
+    <select name="advertiser_id">{% for a in advertisers %}<option value="{{ a.id }}" {{ 'selected' if v.advertiser_id == a.id }}>{{ a.name }}</option>{% endfor %}</select>
+  </label>
+  {% include "_campaign_fields.html" %}
+  <fieldset>
+    <legend>First creative</legend>
+    <div class="grid">
+      <label>Headline <input name="cr_headline" value="{{ v.cr_headline }}" maxlength="90" required></label>
+      <label>Call to action <input name="cr_cta" value="{{ v.cr_cta }}" maxlength="40" required></label>
+      <label>Landing URL <input name="cr_url" value="{{ v.cr_url }}" type="url" required></label>
+      <label>Image URL (optional) <input name="cr_image_url" value="{{ v.cr_image_url }}" type="url"></label>
+    </div>
+    <label>Body <textarea name="cr_body" rows="2" maxlength="300">{{ v.cr_body }}</textarea></label>
+  </fieldset>
+  <button>Create campaign</button>
+</form>
+{% endif %}
+{% endblock %}

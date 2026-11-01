@@ -4,16 +4,29 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+build/
+dist/
 .env
 .env.*
 !.env.example
+
+# Aside runtime data (SQLite database, secret key, demo keys, model cache)
+.aside/
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+sdks/js/dist/
 
 # OS / IDE
 .DS_Store
 .idea/
 .vscode/
 
-# Runtime
+# Tooling
 *.log
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/

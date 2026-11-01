@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aside-ads"
+version = "0.1.0"
+description = "Self-hosted ad server for AI chat apps. Conversations never leave your server."
+readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Pritom Mazumdar" }]
+keywords = ["ads", "ad-server", "llm", "chatbot", "privacy", "self-hosted"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "aiosqlite>=0.20",
+    "alembic>=1.13",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "tzdata; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+embeddings = ["fastembed>=0.3"]
+postgres = ["asyncpg>=0.29"]
+redis = ["redis>=5.0"]
+all = ["fastembed>=0.3", "asyncpg>=0.29", "redis>=5.0"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27", "ruff>=0.5"]
+
+[project.scripts]
+aside = "aside_ads.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Pritom14/aside-ads"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aside_ads"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning:fastembed.*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["docs/archive"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"sdks/python/**" = ["UP007"]  # the client supports Python 3.9
