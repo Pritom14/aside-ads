@@ -11,7 +11,7 @@
   <div><span>Impressions</span><b>{{ grand.impressions|num }}</b></div>
   <div><span>Clicks</span><b>{{ grand.clicks|num }}</b></div>
   <div><span>CTR</span><b>{{ grand.ctr|pct }}</b></div>
-  <div><span>Spend</span><b>{{ "%.2f"|format(grand.spend) }}</b></div>
+  <div><span>Spend ({{ currency }})</span><b>{{ "%.2f"|format(grand.spend) }}</b></div>
   <div><span>Conversions</span><b>{{ grand.conversions|num }}</b></div>
 </div>
 
@@ -20,7 +20,7 @@
 <p class="muted">No campaigns yet. <a href="/dashboard/campaigns/new">Create one</a> or run <code>aside seed-demo</code>.</p>
 {% else %}
 <table>
-  <thead><tr><th>Campaign</th><th>Advertiser</th><th>Status</th><th>Bid</th><th>Daily / total budget</th><th>Spend today</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Spend</th></tr></thead>
+  <thead><tr><th>Campaign</th><th>Advertiser</th><th>Status</th><th>Bid ({{ currency }})</th><th>Daily / total budget</th><th>Spend today</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Spend ({{ currency }})</th></tr></thead>
   <tbody>
   {% for c in campaigns %}{% set t = totals.get(c.id) %}
     <tr>
@@ -44,7 +44,7 @@
 <h2>By day</h2>
 {% if not rows %}<p class="muted">No traffic in this period.</p>{% else %}
 <table>
-  <thead><tr><th>Day</th><th>Campaign</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Spend</th></tr></thead>
+  <thead><tr><th>Day</th><th>Campaign</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Spend ({{ currency }})</th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr><td>{{ r.day }}</td><td><a href="/dashboard/campaigns/{{ r.campaign_id }}">{{ names.get(r.campaign_id, r.campaign_id) }}</a></td>
