@@ -1,10 +1,13 @@
 .git
+.github
 .venv
 .aside
 **/__pycache__
 **/node_modules
-sdks
-examples
-docs
+**/.pytest_cache
+sdks/js
+sdks/python/tests
+examples/react
+deploy
 tests
 *.db

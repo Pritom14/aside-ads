@@ -18,3 +18,13 @@ python examples/chat-demo/app.py   # in a second terminal: http://127.0.0.1:8001
 - After a sensitive message the demo passes `sensitive: true` for the next three turns of that session.
 - Ad clicks go to `/landing/<slug>` on this demo server, which shows the click id an advertiser
   would use for a conversion postback.
+
+## Hosted mode
+
+[`hosted.py`](hosted.py) runs this app and the ad server together on one port, with demo data seeded on
+boot, the dashboard hidden, chat rate limits and daily resets. It is what the public demo image runs; see
+[`deploy/README.md`](../../deploy/README.md).
+
+```bash
+PORT=8080 python examples/chat-demo/hosted.py    # from the repo root, after installing as above
+```

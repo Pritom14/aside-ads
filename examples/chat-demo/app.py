@@ -62,6 +62,8 @@ def _load_env() -> dict[str, str]:
 
 CONFIG = _load_env()
 ASIDE_URL = CONFIG.get("ASIDE_URL", "http://127.0.0.1:8000")
+# Where browsers and advertisers reach Aside (differs from ASIDE_URL in the hosted demo).
+ASIDE_PUBLIC_URL = CONFIG.get("ASIDE_PUBLIC_URL") or ASIDE_URL
 ASIDE_API_KEY = CONFIG.get("ASIDE_API_KEY", "")
 PLACEMENT = CONFIG.get("ASIDE_PLACEMENT", "chat-sidebar")
 
@@ -190,8 +192,10 @@ async def index() -> FileResponse:
     return FileResponse(HERE / "static" / "index.html")
 
 
-# After a sensitive turn, keep ads off for the next few turns of that session (demo-sized, in memory).
+# After a sensitive turn, keep ads off for the next few turns of that session (demo-sized, in memory:
+# session id -> turns left, nothing else).
 QUIET_TURNS = 3
+MAX_QUIET_SESSIONS = 10_000
 _quiet: dict[str, int] = {}
 
 
@@ -208,9 +212,13 @@ async def chat(body: ChatIn) -> dict[str, Any]:
         aside.get_sponsored(messages[-1:], user_id=sid, placement=PLACEMENT, sensitive=quiet),
     )
     if aside.last_reason == "sensitive_context" and not quiet:
+        if len(_quiet) >= MAX_QUIET_SESSIONS:
+            _quiet.clear()
         _quiet[sid] = QUIET_TURNS
     elif quiet:
-        _quiet[sid] -= 1
+        left = _quiet.pop(sid, 1) - 1
+        if left > 0:
+            _quiet[sid] = left
     return {
         "answer": reply,
         "sponsored": asdict(ad) if ad else None,
@@ -240,7 +248,7 @@ async def landing(slug: str, aside_click_id: str = "") -> str:
 <pre style="background:#f4f5f7;padding:12px">aside_click_id={cid}</pre>
 <p>On signup or purchase the advertiser reports a conversion back to Aside:</p>
 <pre style="background:#f4f5f7;padding:12px;white-space:pre-wrap">\
-curl -X POST {html.escape(ASIDE_URL)}/v1/conversions \\
+curl -X POST {html.escape(ASIDE_PUBLIC_URL)}/v1/conversions \\
   -H "Authorization: Bearer $ADVERTISER_OR_ADMIN_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{{"click_id": "{cid}", "idempotency_key": "order-123", "value": 25}}'</pre>

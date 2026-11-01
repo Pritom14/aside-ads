@@ -130,6 +130,7 @@ async function send(text) {
       body: JSON.stringify({ messages: messages.slice(-12), session_id: sessionId }),
     });
     const data = await r.json();
+    if (!r.ok) { bubble.textContent = data.answer || data.detail || ("Error " + r.status); return; }
     bubble.textContent = data.answer;
     messages.push({ role: "assistant", content: data.answer });
     if (data.sponsored) renderAd(slot, data.sponsored);

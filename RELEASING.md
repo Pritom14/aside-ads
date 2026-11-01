@@ -67,3 +67,8 @@ without logging in.
 1. Bump the three versions and add a CHANGELOG section in a pull request.
 2. Merge it, then tag `main`: `git tag vX.Y.Z && git push --tags`.
 3. Watch the Release workflow. Check the run summary for skip notices.
+
+## Hosted demo
+
+The public demo is deployed separately from releases (Fly.io or Hugging Face Spaces). See
+[`deploy/README.md`](deploy/README.md).

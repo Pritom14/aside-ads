@@ -150,8 +150,18 @@ def _read_env(path: Path) -> dict[str, str]:
 
 
 async def seed_demo(
-    sessionmaker: async_sessionmaker[AsyncSession], data_dir: Path, landing_url: str, server_url: str
+    sessionmaker: async_sessionmaker[AsyncSession],
+    data_dir: Path,
+    landing_url: str,
+    server_url: str,
+    *,
+    include_admin_key: bool = True,
 ) -> dict[str, str]:
+    """Create the demo publisher, campaigns and keys (idempotent) and write ``demo.env``.
+
+    With ``include_admin_key=False`` no admin key is created or written to disk
+    (the hosted demo issues its own and prints it to the logs only).
+    """
     landing_url = landing_url.rstrip("/")
     env_path = data_dir / "demo.env"
     existing = _read_env(env_path)
@@ -202,7 +212,10 @@ async def seed_demo(
             created.append(ad.advertiser)
 
         keys = {}
-        for env_name, role in (("ASIDE_ADMIN_KEY", "admin"), ("ASIDE_API_KEY", "publisher")):
+        roles = [("ASIDE_API_KEY", "publisher")]
+        if include_admin_key:
+            roles.insert(0, ("ASIDE_ADMIN_KEY", "admin"))
+        for env_name, role in roles:
             current = existing.get(env_name)
             if current and await lookup_key(s, current) is not None:
                 keys[env_name] = current
@@ -213,12 +226,7 @@ async def seed_demo(
             keys[env_name] = plaintext
         await s.commit()
 
-    values = {
-        "ASIDE_URL": server_url.rstrip("/"),
-        "ASIDE_API_KEY": keys["ASIDE_API_KEY"],
-        "ASIDE_ADMIN_KEY": keys["ASIDE_ADMIN_KEY"],
-        "ASIDE_PLACEMENT": DEMO_PLACEMENT,
-    }
+    values = {"ASIDE_URL": server_url.rstrip("/"), **keys, "ASIDE_PLACEMENT": DEMO_PLACEMENT}
     data_dir.mkdir(parents=True, exist_ok=True)
     env_path.write_text(
         "# Written by `aside seed-demo`. Demo credentials for examples/chat-demo. Do not use in production.\n"
