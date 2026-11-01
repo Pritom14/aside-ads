@@ -1,4 +1,11 @@
-"""``aside seed-demo``: a demo publisher, keys, and sample campaigns from fictional brands."""
+"""``aside seed-demo``: a demo publisher, keys, and sample campaigns from fictional brands.
+
+Two scenarios ship with Aside:
+
+* ``dev`` (the default): "Demo Chat", a general assistant with developer-tool advertisers, in USD.
+* ``cooking``: "Rasoi AI", a free Indian cooking assistant, with kitchen and grocery advertisers
+  bidding in INR.
+"""
 
 from __future__ import annotations
 
@@ -32,6 +39,7 @@ class DemoAd:
     cta: str
     freq_cap: int | None = None
     categories_exclude: tuple[str, ...] = ()
+    campaign: str | None = None  # defaults to "<advertiser> demo"
 
 
 # All brands are fictional. Landing pages are served by examples/chat-demo.
@@ -138,6 +146,96 @@ DEMO_ADS: list[DemoAd] = [
 ]
 
 
+# The cooking scenario. All brands are fictional (each name was checked against existing Indian
+# companies); amounts are in INR. Targeting describes what each advertiser wants to sit next to:
+# buying intent or a problem their product solves, not every mention of a word.
+COOKING_ADS: list[DemoAd] = [
+    DemoAd(
+        "Thaila Now",
+        "thaila-now",
+        "cpc",
+        "6",
+        "1500",
+        "ordering ingredients for a recipe like paneer butter masala, biryani or dal makhani\n"
+        "groceries delivered fast: paneer, butter, cream, tomatoes, onions and fresh vegetables\n"
+        "cooking dinner for my family or guests tonight",
+        "Cooking tonight? Get the ingredients in 10 minutes",
+        "Paneer, cream, tomatoes and fresh coriander, delivered from a store near you. No minimum order.",
+        "Order ingredients",
+        campaign="Thaila Now: recipe ingredients",
+    ),
+    DemoAd(
+        "Lohasutra Cookware",
+        "lohasutra",
+        "cpc",
+        "8",
+        "1000",
+        "my kadhai, tawa or pan keeps sticking or rusting\n"
+        "seasoning and caring for cast iron cookware\n"
+        "buying a new cast iron kadhai, tawa or non-stick pan",
+        "Pre-seasoned cast-iron kadhais",
+        "Ready to cook from day one and better with every use. Each one comes with a two-minute care guide.",
+        "Shop kadhais",
+        campaign="Lohasutra: cast-iron kadhais",
+    ),
+    DemoAd(
+        "Jeera Lane",
+        "jeera-lane",
+        "cpm",
+        "55",
+        "600",
+        "making garam masala, chai masala or biryani masala at home\n"
+        "buying spices and spice blends for my kitchen\n"
+        "keeping whole spices fresh in a masala dabba",
+        "Masalas ground every week, not every year",
+        "Small-batch garam masala, chai masala and biryani masala, packed within days of grinding.",
+        "Explore masalas",
+        campaign="Jeera Lane: fresh masalas",
+    ),
+    DemoAd(
+        "Chakkiwell",
+        "chakkiwell",
+        "cpc",
+        "10",
+        "2000",
+        "choosing a mixer grinder for idli and dosa batter or chutneys\n"
+        "wet grinder or mixer grinder for an Indian kitchen\n"
+        "pressure cooker whistle, gasket or safety valve problems",
+        "Smooth idli batter in one go",
+        "A 750 W mixer grinder with a wet-grinding jar. Pressure cookers and spare gaskets too.",
+        "See mixer grinders",
+        campaign="Chakkiwell: mixer grinders",
+    ),
+    DemoAd(
+        "Tadka Talim",
+        "tadka-talim",
+        "cpm",
+        "30",
+        "500",
+        "learning to cook Indian food as a beginner\n"
+        "cooking classes and step-by-step video lessons\n"
+        "improving my cooking skills, making soft rotis or a perfect biryani",
+        "Learn the dishes you grew up eating",
+        "Short video lessons from home cooks: soft rotis, dal, biryani and more. First week free.",
+        "Start a free class",
+        campaign="Tadka Talim: video cooking classes",
+    ),
+]
+
+
+@dataclass(frozen=True)
+class DemoScenario:
+    publisher: str
+    currency: str
+    ads: list[DemoAd]
+
+
+SCENARIOS: dict[str, DemoScenario] = {
+    "dev": DemoScenario(DEMO_PUBLISHER, "USD", DEMO_ADS),
+    "cooking": DemoScenario("Rasoi AI", "INR", COOKING_ADS),
+}
+
+
 def _read_env(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
@@ -156,22 +254,28 @@ async def seed_demo(
     server_url: str,
     *,
     include_admin_key: bool = True,
+    scenario: str = "dev",
 ) -> dict[str, str]:
     """Create the demo publisher, campaigns and keys (idempotent) and write ``demo.env``.
+
+    ``scenario`` picks the publisher and advertisers (see ``SCENARIOS``). Bids and budgets
+    are in the scenario's currency; ``demo.env`` records it as ``ASIDE_CURRENCY`` so the
+    server can be started with the matching setting.
 
     With ``include_admin_key=False`` no admin key is created or written to disk
     (the hosted demo issues its own and prints it to the logs only).
     """
+    if scenario not in SCENARIOS:
+        raise ValueError(f"unknown demo scenario {scenario!r}; choose from {', '.join(SCENARIOS)}")
+    sc = SCENARIOS[scenario]
     landing_url = landing_url.rstrip("/")
     env_path = data_dir / "demo.env"
     existing = _read_env(env_path)
     created: list[str] = []
     async with sessionmaker() as s:
-        pub = (
-            await s.execute(select(Publisher).where(Publisher.name == DEMO_PUBLISHER))
-        ).scalar_one_or_none()
+        pub = (await s.execute(select(Publisher).where(Publisher.name == sc.publisher))).scalar_one_or_none()
         if pub is None:
-            pub = await create_publisher(s, DEMO_PUBLISHER, "localhost")
+            pub = await create_publisher(s, sc.publisher, "localhost")
         for key in (DEMO_PLACEMENT, "default"):
             exists = (
                 await s.execute(
@@ -181,7 +285,7 @@ async def seed_demo(
             if exists is None:
                 await add_placement(s, pub.id, key, key.replace("-", " ").title())
 
-        for ad in DEMO_ADS:
+        for ad in sc.ads:
             adv = (
                 await s.execute(select(Advertiser).where(Advertiser.name == ad.advertiser))
             ).scalar_one_or_none()
@@ -194,7 +298,7 @@ async def seed_demo(
                 s,
                 CampaignIn(
                     advertiser_id=adv.id,
-                    name=f"{ad.advertiser} demo",
+                    name=ad.campaign or f"{ad.advertiser} demo",
                     bid_type=ad.bid_type,
                     bid=Decimal(ad.bid),
                     daily_budget=Decimal(ad.daily_budget),
@@ -217,7 +321,11 @@ async def seed_demo(
             roles.insert(0, ("ASIDE_ADMIN_KEY", "admin"))
         for env_name, role in roles:
             current = existing.get(env_name)
-            if current and await lookup_key(s, current) is not None:
+            found = await lookup_key(s, current) if current else None
+            # Reuse a key only if it still fits: a publisher key from another scenario's
+            # publisher would serve that publisher's placements.
+            fits = found is not None and found.role == role
+            if fits and (role != "publisher" or found.publisher_id == pub.id):
                 keys[env_name] = current
                 continue
             _, plaintext = await create_api_key(
@@ -226,7 +334,13 @@ async def seed_demo(
             keys[env_name] = plaintext
         await s.commit()
 
-    values = {"ASIDE_URL": server_url.rstrip("/"), **keys, "ASIDE_PLACEMENT": DEMO_PLACEMENT}
+    values = {
+        "ASIDE_URL": server_url.rstrip("/"),
+        **keys,
+        "ASIDE_PLACEMENT": DEMO_PLACEMENT,
+        "ASIDE_DEMO_SCENARIO": scenario,
+        "ASIDE_CURRENCY": sc.currency,
+    }
     data_dir.mkdir(parents=True, exist_ok=True)
     env_path.write_text(
         "# Written by `aside seed-demo`. Demo credentials for examples/chat-demo. Do not use in production.\n"

@@ -63,16 +63,23 @@ def cmd_seed(args: argparse.Namespace, settings: Settings) -> int:
     async def go() -> dict[str, str]:
         engine, sm = await _sessionmaker(settings)
         try:
-            return await seed_demo(sm, settings.data_dir, args.landing_url, args.server_url)
+            return await seed_demo(
+                sm, settings.data_dir, args.landing_url, args.server_url, scenario=args.scenario
+            )
         finally:
             await engine.dispose()
 
     out = asyncio.run(go())
-    print(f"Seeded demo campaigns: {out['created']}")
+    currency = out["ASIDE_CURRENCY"]
+    print(f"Seeded demo campaigns ({args.scenario}): {out['created']}")
     print(f"Publisher key (placement '{out['ASIDE_PLACEMENT']}'): {out['ASIDE_API_KEY']}")
     print(f"Admin key (dashboard login):               {out['ASIDE_ADMIN_KEY']}")
     print(f"Saved to {out['env_file']} (read by examples/chat-demo).")
-    print("Next: `aside serve`, then open http://127.0.0.1:8000/dashboard")
+    if settings.currency.upper() != currency:
+        print(f"Bids and budgets are in {currency}. Start the server with ASIDE_CURRENCY={currency}.")
+        print(f"Next: `ASIDE_CURRENCY={currency} aside serve`, then open http://127.0.0.1:8000/dashboard")
+    else:
+        print("Next: `aside serve`, then open http://127.0.0.1:8000/dashboard")
     return 0
 
 
@@ -148,6 +155,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     d.add_argument(
         "--server-url", default="http://127.0.0.1:8000", help="URL the demo app uses to reach Aside"
+    )
+    d.add_argument(
+        "--scenario",
+        choices=["dev", "cooking"],
+        default="dev",
+        help="dev: a general assistant with developer-tool advertisers (USD). "
+        "cooking: Rasoi AI, an Indian cooking assistant with kitchen advertisers (INR)",
     )
     d.set_defaults(func=cmd_seed)
 

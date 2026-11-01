@@ -24,8 +24,9 @@ Run locally (no Docker):
 Settings (environment): PORT, HOST, ASIDE_PUBLIC_URL (default: derived from
 FLY_APP_NAME or SPACE_HOST, else http://localhost:PORT), ASIDE_DATA_DIR,
 ASIDE_DEMO_CHAT_PER_MINUTE (20), ASIDE_DEMO_CHAT_GLOBAL_PER_MINUTE (600),
-ASIDE_DEMO_MAX_EVENTS, ASIDE_DEMO_RESET_HOURS, ASIDE_DEMO_DASHBOARD, and the LLM_*
-variables of the chat demo.
+ASIDE_DEMO_MAX_EVENTS, ASIDE_DEMO_RESET_HOURS, ASIDE_DEMO_DASHBOARD,
+ASIDE_DEMO_SCENARIO (dev or cooking, as in ``aside seed-demo --scenario``; it also sets
+the default ASIDE_CURRENCY), and the LLM_* variables of the chat demo.
 """
 
 from __future__ import annotations
@@ -176,7 +177,7 @@ async def _events(sessionmaker: Any) -> int:
         return int((await s.execute(select(func.count()).select_from(Event))).scalar_one())
 
 
-async def _prepare(settings: Any, public_url: str, internal_url: str) -> str:
+async def _prepare(settings: Any, public_url: str, internal_url: str, scenario: str = "dev") -> str:
     """Seed if needed, rotate the admin key, return the publisher key. Runs before the app starts."""
     from sqlalchemy import update
 
@@ -191,7 +192,12 @@ async def _prepare(settings: Any, public_url: str, internal_url: str) -> str:
         await create_all(engine)
         sm = make_sessionmaker(engine)
         out = await seed_demo(
-            sm, settings.data_dir, f"{public_url}/landing", internal_url, include_admin_key=False
+            sm,
+            settings.data_dir,
+            f"{public_url}/landing",
+            internal_url,
+            include_admin_key=False,
+            scenario=scenario,
         )
         async with sm() as s:
             await s.execute(
@@ -223,9 +229,16 @@ def main() -> None:
         os.environ.pop(var, None)  # the demo always uses its own SQLite file and in-process counters
 
     from aside_ads.config import Settings
+    from aside_ads.seed import SCENARIOS
+
+    scenario = os.environ.get("ASIDE_DEMO_SCENARIO", "dev").strip().lower()
+    if scenario not in SCENARIOS:
+        raise SystemExit(f"ASIDE_DEMO_SCENARIO must be one of: {', '.join(SCENARIOS)}")
+    os.environ["ASIDE_DEMO_SCENARIO"] = scenario  # read by the chat app
+    os.environ.setdefault("ASIDE_CURRENCY", SCENARIOS[scenario].currency)
 
     settings = Settings()
-    publisher_key = asyncio.run(_prepare(settings, public_url, internal_url))
+    publisher_key = asyncio.run(_prepare(settings, public_url, internal_url, scenario))
 
     # The chat app reads its configuration at import time.
     os.environ.update(
