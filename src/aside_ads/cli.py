@@ -168,5 +168,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    for noisy in ("httpx", "httpcore", "huggingface_hub", "alembic.runtime.plugins"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     args = build_parser().parse_args(argv)
     return int(args.func(args, Settings()) or 0)
