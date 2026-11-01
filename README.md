@@ -1,11 +1,16 @@
 # Aside
 
+[![CI](https://github.com/Pritom14/aside-ads/actions/workflows/ci.yml/badge.svg)](https://github.com/Pritom14/aside-ads/actions/workflows/ci.yml)
+
 An open-source, self-hosted ad server for AI chat apps. Conversations never leave your server.
 
 An HTML `<aside>` sits beside the main content. Aside ads work the same way: a card labeled
 "Sponsored" next to the model's answer, never inside it.
 
 Status: early (v0.1). The API may change before 1.0.
+
+**[Try the hosted demo](https://TODO-demo-url)**: a chat app with sponsored cards beside relevant answers.
+<!-- TODO: replace the link with the Fly.io or Hugging Face URL after deploying (see deploy/README.md). -->
 
 ## Why
 
@@ -31,9 +36,19 @@ Aside gives you the ad server and nothing else:
 Prior art in the same spirit: [Revive Adserver](https://www.revive-adserver.com/) (self-hosted ad server)
 and [EthicalAds](https://www.ethicalads.io/) (contextual, privacy-first developer ads).
 
+## Install
+
+```bash
+pip install "aside-ads[embeddings]"   # the server; omit [embeddings] for keyword-only matching
+pip install aside-ads-client          # Python SDK
+npm i aside-ads                       # JS/TypeScript SDK
+```
+
+The packages are available after the first release (v0.1.0). Until then, install from a checkout as below.
+
 ## Quickstart
 
-Not on PyPI yet; install from a checkout. Python 3.10+.
+From a checkout. Python 3.10+.
 
 ```bash
 git clone https://github.com/Pritom14/aside-ads && cd aside-ads
@@ -257,7 +272,6 @@ to build, direct relationships, or cannot send chats to a third party.
 - More creative formats (image cards, product cards) and CTR-based creative rotation.
 - Stronger invalid-traffic detection and viewability measurement.
 - Advertiser self-serve access and invoicing exports.
-- Publish the SDKs to PyPI and npm.
 
 ## Development
 
@@ -265,11 +279,18 @@ to build, direct relationships, or cannot send chats to a third party.
 uv pip install -e ".[dev,embeddings]"
 pytest                                    # no network; BM25 and fake embedders
 ASIDE_TEST_FASTEMBED=1 pytest -k fastembed  # optional real-model check
+ASIDE_TEST_DATABASE_URL=postgresql+asyncpg://aside:aside@127.0.0.1:5432/aside_test pytest  # PostgreSQL (wiped)
 ruff check . && ruff format --check .
-cd sdks/js && npm install && npx tsc --noEmit
+(cd sdks/python && pytest)
+(cd sdks/js && npm ci && npx tsc --noEmit)
 ```
 
-Layout: `src/aside_ads` (server), `sdks/python`, `sdks/js`, `examples/chat-demo`, `examples/react`.
+Layout: `src/aside_ads` (server), `sdks/python`, `sdks/js`, `examples/chat-demo`, `examples/react`,
+`deploy` (hosted demo on Fly.io or Hugging Face Spaces).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, [SECURITY.md](SECURITY.md) to report a
+vulnerability privately, [CHANGELOG.md](CHANGELOG.md) for releases and [RELEASING.md](RELEASING.md) for how
+they are published.
 
 ## License
 
