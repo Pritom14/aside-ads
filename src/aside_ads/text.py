@@ -7,7 +7,10 @@ from functools import lru_cache
 
 # Split on whitespace and punctuation (ASCII plus the Devanagari danda) but keep
 # non-Latin words intact: Python's \w would split Indic words at vowel signs.
-_SPLIT = re.compile(r"[\s.,;:!?¡¿()\[\]{}\"`/\\|<>@#$%^&*+=~\-_।॥–—‘’“”…]+")
+_SPLIT = re.compile(
+    r"[\s.,;:!?\u00a1\u00bf()\[\]{}\"`/\\|<>@#$%^&*+=~\-_"
+    r"\u0964\u0965\u2013\u2014\u2018\u201c\u201d\u2026]+"
+)
 
 STOPWORDS = frozenset(
     """
@@ -59,8 +62,9 @@ def normalize_token(word: str) -> str:
 
 def tokenize(text: str, *, drop_stopwords: bool = False) -> list[str]:
     out: list[str] = []
-    for raw in _SPLIT.split(text.lower()):
-        raw = raw.replace("'", "").replace("’", "")
+    # Curly apostrophes become straight ones and are then dropped: "don’t" -> "dont".
+    for raw in _SPLIT.split(text.lower().replace("’", "'")):
+        raw = raw.replace("'", "")
         if not raw:
             continue
         if drop_stopwords and raw in STOPWORDS:
