@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ads-ai-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ads_ai
+    ports:
+      - "5433:5432"
+    volumes:
+      - ads_ai_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ads_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ads-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ads_ai_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  ads_ai_postgres_data:
+  ads_ai_redis_data:
