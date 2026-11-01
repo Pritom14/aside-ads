@@ -275,16 +275,35 @@ def main() -> None:
             except Exception:  # keep the demo up; try again next round
                 log.exception("Demo housekeeping failed")
 
+    async def warm_up() -> None:
+        # The first ad request loads the embedding model and embeds every ad and exemplar. On a
+        # small instance that takes longer than the chat app's 2 s ad timeout, so the first
+        # visitor after each boot would get no card. Make that request ourselves at startup.
+        await asyncio.sleep(1)
+        started = time.monotonic()
+        try:
+            client = chat.AsyncAsideClient(internal_url, publisher_key, timeout=180)
+            await client.get_sponsored(
+                [{"role": "user", "content": "warm up the matcher"}],
+                user_id="hosted-demo-warmup",
+                placement="chat-sidebar",
+            )
+            log.warning("Matcher warmed up in %.1fs", time.monotonic() - started)
+        except Exception:  # the demo still works; the first real request just pays the cost
+            log.exception("Matcher warm-up failed")
+
     @contextlib.asynccontextmanager
     async def lifespan(_: Any) -> AsyncIterator[None]:
         rt = await Runtime.create(settings)
         gate.app = create_app(runtime=rt)
         task = asyncio.create_task(housekeeping(rt))
+        warm = asyncio.create_task(warm_up())
         log.warning("Aside demo on %s (matcher: %s)", public_url, rt.matcher.name)
         try:
             yield
         finally:
             task.cancel()
+            warm.cancel()
             await rt.close()
 
     chat.app.router.lifespan_context = lifespan
