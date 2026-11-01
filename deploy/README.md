@@ -16,6 +16,17 @@ public port. It is a public playground, not a production setup. What it does
 
 Data lives in `/tmp/aside-demo` inside the container and disappears on restart, which re-seeds it.
 
+## Render
+
+[`render.yaml`](../render.yaml) is a Blueprint for one Docker web service built from
+[`render/Dockerfile`](render/Dockerfile) (the demo image as a single stage) in region `singapore`, running the
+cooking scenario (Rasoi AI). In the Render dashboard choose New, Blueprint, pick this repository and apply.
+
+The `starter` plan stays on. The free plan also works but sleeps after 15 idle minutes and takes about a
+minute to wake, and every wake re-seeds the demo and prints a new admin key to the logs. The public URL
+used in ad links comes from `RENDER_EXTERNAL_URL`, which Render sets; set `ASIDE_PUBLIC_URL` for a custom
+domain.
+
 ## Fly.io
 
 [`fly.toml`](../fly.toml) builds the `demo` target in region `bom` on the smallest shared CPU with 512 MB
