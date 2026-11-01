@@ -2,7 +2,7 @@
 # Render dashboard: New > Blueprint > pick this repository > Apply.
 services:
   - type: web
-    name: aside-demo
+    name: aside-ads
     runtime: docker
     # starter stays on; free sleeps after 15 idle minutes and takes about a minute to wake
     plan: starter
