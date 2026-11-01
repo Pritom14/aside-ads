@@ -7,9 +7,9 @@
 </div>
 {% if request.query_params.get('saved') %}<div class="flash ok">Saved.</div>{% endif %}
 <div class="stats">
-  <div><span>Bid</span><b>{{ c.bid_micros|money }} {{ c.bid_type|upper }}</b></div>
-  <div><span>Spend today</span><b>{{ (c.spend_today_micros if c.spend_day == today else 0)|money }} / {{ c.daily_budget_micros|money }}</b></div>
-  <div><span>Spend total</span><b>{{ c.spend_total_micros|money }} / {{ c.total_budget_micros|money }}</b></div>
+  <div><span>Bid ({{ currency }})</span><b>{{ c.bid_micros|money }} {{ c.bid_type|upper }}</b></div>
+  <div><span>Spend today ({{ currency }})</span><b>{{ (c.spend_today_micros if c.spend_day == today else 0)|money }} / {{ c.daily_budget_micros|money }}</b></div>
+  <div><span>Spend total ({{ currency }})</span><b>{{ c.spend_total_micros|money }} / {{ c.total_budget_micros|money }}</b></div>
   <div><span>Impressions</span><b>{{ c.impressions_total|num }}</b></div>
   <div><span>Clicks</span><b>{{ c.clicks_total|num }}</b></div>
 </div>
@@ -45,7 +45,7 @@
 <h2>Last 30 days</h2>
 {% if not rows %}<p class="muted">No traffic yet.</p>{% else %}
 <table>
-  <thead><tr><th>Day</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Conv. value</th><th class="r">Spend</th></tr></thead>
+  <thead><tr><th>Day</th><th class="r">Impr.</th><th class="r">Clicks</th><th class="r">CTR</th><th class="r">Conv.</th><th class="r">Conv. value</th><th class="r">Spend ({{ currency }})</th></tr></thead>
   <tbody>
   {% for r in rows %}
   <tr><td>{{ r.day }}</td><td class="r">{{ r.impressions|num }}</td><td class="r">{{ r.clicks|num }}</td><td class="r">{{ r.ctr|pct }}</td>
