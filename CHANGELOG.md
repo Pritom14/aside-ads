@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Integrations
+
+- Open WebUI filter function (`integrations/open-webui/aside_sponsored_filter.py`, MIT): after an answer
+  finishes, it sends only the latest user message to Aside and attaches the ad as a separate Rich UI card
+  labeled "Sponsored", without editing the answer. No card on sensitive or unrelated messages, timeouts or
+  errors. Valves for the Aside URL, key, placement, timeout, frequency and showing the card only with the
+  newest answer. Impressions are recorded once per card with the signed impression URL. Tested with Open
+  WebUI 0.12.5.
+
 ### Demo
 
 - `aside seed-demo --scenario cooking`: "Rasoi AI", a free Indian cooking assistant, with five
