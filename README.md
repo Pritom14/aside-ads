@@ -140,6 +140,13 @@ React: [`examples/react/SponsoredCard.tsx`](examples/react/SponsoredCard.tsx) re
 column and counts the impression at 50% visibility. Keep the publisher key on your server; the browser only
 needs the signed `url` and `impression_url`.
 
+## Integrations
+
+- **[Open WebUI](integrations/open-webui)**: a single-file filter function. Paste it into Admin Panel >
+  Functions, set your Aside URL and publisher key, and relevant answers get a separate card labeled
+  "Sponsored"; the answer text is never changed. Only the latest user message is sent to Aside. Tested
+  with Open WebUI 0.12.5, MIT licensed.
+
 ## How it works
 
 ```
@@ -289,8 +296,8 @@ ruff check . && ruff format --check .
 (cd sdks/js && npm ci && npx tsc --noEmit)
 ```
 
-Layout: `src/aside_ads` (server), `sdks/python`, `sdks/js`, `examples/chat-demo`, `examples/react`,
-`deploy` (hosted demo on Fly.io or Hugging Face Spaces).
+Layout: `src/aside_ads` (server), `sdks/python`, `sdks/js`, `integrations/open-webui`,
+`examples/chat-demo`, `examples/react`, `deploy` (hosted demo on Fly.io or Hugging Face Spaces).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide, [SECURITY.md](SECURITY.md) to report a
 vulnerability privately, [CHANGELOG.md](CHANGELOG.md) for releases and [RELEASING.md](RELEASING.md) for how
@@ -299,5 +306,5 @@ they are published.
 ## License
 
 The Aside server is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`, see
-[LICENSE](LICENSE)). The client SDKs in `sdks/python` and `sdks/js` are MIT licensed, so commercial AI apps
-can embed them without AGPL obligations.
+[LICENSE](LICENSE)). The client SDKs in `sdks/python` and `sdks/js` and the Open WebUI filter in
+`integrations/open-webui` are MIT licensed, so commercial AI apps can embed them without AGPL obligations.

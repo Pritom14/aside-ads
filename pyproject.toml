@@ -54,7 +54,7 @@ path = "src/aside_ads/__init__.py"
 packages = ["src/aside_ads"]
 
 [tool.hatch.build.targets.sdist]
-include = ["/src/aside_ads", "/tests", "/alembic.ini", "/.env.example", "/README.md", "/LICENSE"]
+include = ["/src/aside_ads", "/tests", "/integrations", "/alembic.ini", "/.env.example", "/README.md", "/LICENSE"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
