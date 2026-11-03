@@ -242,3 +242,75 @@ class DailyStat(Base):
     conversions: Mapped[int] = mapped_column(BigInteger, default=0)
     spend_micros: Mapped[int] = mapped_column(BigInteger, default=0)
     conversion_value_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class ServeOutcome(Base):
+    """How many serve requests each placement got per day, by outcome: ``filled`` or the no-ad reason.
+
+    Counts only: nothing about the conversation is stored. This is what answers "why did no ad show?".
+    """
+
+    __tablename__ = "serve_outcomes"
+
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    publisher_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    placement_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    outcome: Mapped[str] = mapped_column(String(32), primary_key=True)
+    requests: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class BudgetMiss(Base):
+    """Requests a campaign matched but could not take because its budget or pacing held it back."""
+
+    __tablename__ = "budget_misses"
+
+    campaign_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    requests: Mapped[int] = mapped_column(BigInteger, default=0)
+    first_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # first miss that day
+
+
+class AuditEntry(Base):
+    """A change made through the API or an agent connection: who, what, and the values before and after."""
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    api_key_id: Mapped[str | None] = mapped_column(String(32))
+    actor: Mapped[str] = mapped_column(String(200), default="")
+    via: Mapped[str] = mapped_column(String(16))  # api | agent
+    action: Mapped[str] = mapped_column(String(40))
+    target_id: Mapped[str] = mapped_column(String(32))
+    target_name: Mapped[str] = mapped_column(String(200), default="")
+    before: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    after: Mapped[dict[str, Any]] = mapped_column(default=dict)
+
+
+class OAuthClient(Base):
+    """An MCP client (Claude, ChatGPT, ...) registered through OAuth dynamic client registration."""
+
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    info: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class OAuthGrant(Base):
+    """Pending approvals, authorization codes and tokens for agent connections, stored as SHA-256 hashes.
+
+    Every code and token is tied to the Aside API key that approved it, so revoking that key cuts the
+    connection off.
+    """
+
+    __tablename__ = "oauth_grants"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10))  # pending | code | access | refresh
+    client_id: Mapped[str] = mapped_column(String(64), index=True)
+    api_key_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    scopes: Mapped[list[str]] = mapped_column(default=list)
+    expires_at: Mapped[float] = mapped_column(Float)
+    data: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

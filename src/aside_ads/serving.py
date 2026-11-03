@@ -3,7 +3,9 @@
 Privacy: the conversation text is wrapped in a ``ContextAnalysis`` that exists
 only for the duration of this call. Nothing derived from it (text, tokens,
 embedding, detected categories) is written to the database, logs or counters.
-Only the outcome (which ad, at what price) leaves this module.
+Only the outcome (which ad, at what price) leaves this module, plus daily counts per
+placement of how requests ended (``filled`` or the no-ad reason) and per campaign of matches
+it lost to its budget. Those counts are what the reports and the agent connector explain.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from aside_ads.auction import Candidate, clearing_price, impression_cost, predicted_ctr, rank
+from aside_ads.delivery import record_delivery
 from aside_ads.matching import AdDoc, ContextAnalysis
 from aside_ads.models import Campaign, Creative, Placement, new_id
 from aside_ads.pacing import budget_allows, day_fraction, pacing_allows
@@ -62,6 +65,16 @@ def _fc_key(campaign_id: str, user_hash: str) -> str:
 
 
 async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str) -> ServeResponse:
+    missed: list[str] = []
+    resp = await _serve(rt, publisher_id, req, base_url, missed)
+    await record_delivery(rt, publisher_id, req.placement, "filled" if resp.ad else resp.reason, missed)
+    return resp
+
+
+async def _serve(
+    rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str, missed: list[str]
+) -> ServeResponse:
+    """Pick an ad. Appends to ``missed`` the campaigns that matched but were held back by budget."""
     request_id = new_id()
     now = rt.now()
     day = rt.day(now)
@@ -96,11 +109,7 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
     geo = req.geo
     frac = day_fraction(now, rt.tz)
 
-    def static_ok(c: Campaign) -> bool:
-        # Outstanding reservations count as spend. This read only filters; reserve() below
-        # re-checks under a lock before an ad is returned.
-        reserved = held.get(c.id, 0)
-        spend_today = (c.spend_today_micros if c.spend_day == day else 0) + reserved
+    def fits(c: Campaign) -> bool:
         return (
             any(cr.status == "active" for cr in c.creatives)
             and placement_allows(c, placement.key)
@@ -112,22 +121,28 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
                 geo.lat if geo else None,
                 geo.lng if geo else None,
             )
-            and budget_allows(
-                unit_cost_micros=_unit_cost(c),
-                spend_today_micros=spend_today,
-                daily_budget_micros=c.daily_budget_micros,
-                spend_total_micros=c.spend_total_micros + reserved,
-                total_budget_micros=c.total_budget_micros,
-            )
-            and pacing_allows(spend_today, c.daily_budget_micros, frac, settings.pacing_buffer, c.pacing)
         )
+
+    def funded(c: Campaign) -> bool:
+        # Outstanding reservations count as spend. This read only filters; reserve() below
+        # re-checks under a lock before an ad is returned.
+        reserved = held.get(c.id, 0)
+        spend_today = (c.spend_today_micros if c.spend_day == day else 0) + reserved
+        return budget_allows(
+            unit_cost_micros=_unit_cost(c),
+            spend_today_micros=spend_today,
+            daily_budget_micros=c.daily_budget_micros,
+            spend_total_micros=c.spend_total_micros + reserved,
+            total_budget_micros=c.total_budget_micros,
+        ) and pacing_allows(spend_today, c.daily_budget_micros, frac, settings.pacing_buffer, c.pacing)
 
     def analyze() -> tuple[str | None, list[_Scored]]:
         # CPU-bound (tokenizing, embedding), run in a worker thread.
         ctx = ContextAnalysis(req.context_text(), settings.max_context_chars)
         if rt.guard.classify(ctx, first_only=True):
             return "sensitive_context", []
-        pool = [c for c in campaigns if static_ok(c) and keywords_allow(c, ctx)]
+        # Campaigns held back by budget or pacing are scored too, so a match they lose is counted.
+        pool = [c for c in campaigns if fits(c) and keywords_allow(c, ctx)]
         if not pool:
             return "no_eligible_campaigns", []
         hinted = {x.strip().lower() for x in req.categories}
@@ -138,12 +153,16 @@ async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str
                 return "no_eligible_campaigns", []
         active = {c.id: [cr for cr in c.creatives if cr.status == "active"] for c in pool}
         scores = rt.matcher.relevance(ctx, [_ad_doc(c, active[c.id]) for c in pool])
-        scored = [
+        relevant = [
             _Scored(c, rel)
             for c, rel in zip(pool, scores, strict=True)
             if rel >= (c.min_relevance if c.min_relevance is not None else rt.relevance_threshold)
         ]
-        return (None if scored else "below_relevance_threshold"), scored
+        scored = [sc for sc in relevant if funded(sc.campaign)]
+        missed.extend(sc.campaign.id for sc in relevant if not funded(sc.campaign))
+        if scored:
+            return None, scored
+        return ("budget_exhausted" if missed else "below_relevance_threshold"), []
 
     reason, scored = await anyio.to_thread.run_sync(analyze)
     if reason:

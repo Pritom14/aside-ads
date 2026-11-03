@@ -71,7 +71,7 @@ async def test_no_overspend_under_concurrent_serves_and_impressions(world) -> No
     assert results.count("counted") == 10  # reservations: no unbilled ads were served
     # Exhausted: stop serving.
     after = await world.serve(DB_CONTEXT)
-    assert after["ad"] is None and after["reason"] == "no_eligible_campaigns"
+    assert after["ad"] is None and after["reason"] == "budget_exhausted"
 
 
 async def test_concurrent_serve_burst_delivers_only_what_the_budget_pays_for(world) -> None:  # type: ignore[no-untyped-def]
@@ -96,7 +96,7 @@ async def test_expired_reservations_release_budget(world) -> None:  # type: igno
     ads = [(await world.serve(DB_CONTEXT))["ad"] for _ in range(10)]
     assert all(ads)
     blocked = await world.serve(DB_CONTEXT)
-    assert blocked["ad"] is None and blocked["reason"] == "no_eligible_campaigns"
+    assert blocked["ad"] is None and blocked["reason"] == "budget_exhausted"
     clock["now"] += timedelta(seconds=world.rt.settings.reservation_ttl - 1)
     assert (await world.serve(DB_CONTEXT))["ad"] is None  # still held
     clock["now"] += timedelta(seconds=2)
