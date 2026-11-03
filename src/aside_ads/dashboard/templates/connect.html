@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% set hide_nav = true %}
+{% block title %}Connect an agent{% endblock %}
+{% block content %}
+<section class="card narrow">
+  {% if error_only %}
+  <h1>Connection request expired</h1>
+  <p class="muted">{{ error }}</p>
+  {% else %}
+  <h1>Connect {{ client_name }} to Aside</h1>
+  <p>Paste an Aside key to let this agent read your ad reports.</p>
+  <ul class="muted">
+    <li><strong>Admin key:</strong> reports for every campaign and placement, and changes to a campaign's
+      status, budget or bid. Your agent should ask you before each change, and every change is logged.</li>
+    <li><strong>Advertiser key:</strong> read-only reports for that advertiser's campaigns.</li>
+  </ul>
+  <p class="muted">Conversations are never stored by Aside, so the agent only ever sees counts and money.
+    Revoke the key in the dashboard to disconnect.</p>
+  {% if error %}<p class="flash error">{{ error }}</p>{% endif %}
+  <form method="post" action="/connect">
+    <input type="hidden" name="request" value="{{ request_id }}">
+    <label>Aside key <input type="password" name="key" autocomplete="off" autofocus></label>
+    <button name="action" value="approve">Connect</button>
+    <button name="action" value="deny" class="link">Cancel</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

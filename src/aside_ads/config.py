@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     secret_key: str | None = None
     # Public base URL used in impression/click links. Defaults to the request's base URL.
     public_url: str | None = None
+    # Port used to build local URLs when public_url is not set (match `aside serve --port`).
+    port: int = 8000
+    # Agent connector: an MCP server at /mcp for Claude, ChatGPT and other MCP clients.
+    connector: bool = True
     trust_proxy_headers: bool = False
 
     # Matching ----------------------------------------------------------------

@@ -7,6 +7,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Agent connector
+
+- Aside is a remote MCP server at `/mcp` (streamable HTTP, stateless), so Claude, ChatGPT and other MCP
+  clients can work with it. Tools: `ads_overview`, `campaign_report`, `delivery_report`,
+  `advertiser_report`, `recent_changes` and `update_campaign_settings` (status, daily or lifetime budget,
+  bid). Admin keys read everything and may change campaigns; advertiser keys read their own campaigns only.
+- OAuth 2.1 for clients that need it (dynamic client registration, PKCE, refresh-token rotation,
+  revocation). The user approves on `/connect` with an Aside key; codes and tokens are stored as SHA-256
+  hashes and stop working when that key is revoked. Clients that send headers can pass the key directly.
+- Audit log (`audit_log` table) of every change made through the connector, with the values before and
+  after.
+- Delivery counts: each serve request is counted per day and placement by outcome (`filled` or the no-ad
+  reason), and each campaign's matches lost to budget or pacing are counted with the time of the first one.
+  Reports use them to say when a budget ran out and how many matching conversations it missed.
+- `ASIDE_CONNECTOR` (default on) and `ASIDE_PORT`; `aside serve --port` passes the port on.
+- `examples/agent-demo/simulate.py` fills a demo database with a simulated day of chat traffic.
+
+### Changed
+
+- A request whose only matching campaigns are held back by budget or pacing now returns
+  `reason: "budget_exhausted"` instead of `"no_eligible_campaigns"`.
+
 ### Integrations
 
 - Open WebUI filter function (`integrations/open-webui/aside_sponsored_filter.py`, MIT): after an answer

@@ -146,6 +146,54 @@ needs the signed `url` and `impression_url`.
   Functions, set your Aside URL and publisher key, and relevant answers get a separate card labeled
   "Sponsored"; the answer text is never changed. Only the latest user message is sent to Aside. Tested
   with Open WebUI 0.12.5, MIT licensed.
+- **[Your AI agent](#connect-your-ai-agent)**: Aside is also an MCP server, so Claude, ChatGPT or any
+  MCP client can read your ad reports and, with your approval, change budgets.
+
+## Connect your AI agent
+
+Running your own ad server means doing the ad ops: noticing a budget ran out, answering "how is my
+campaign doing?", working out why an ad stopped showing. Aside has a remote MCP server built in at
+`/mcp`, so the AI agent you already use can do that work from Aside's numbers.
+
+```text
+You:    How did my ads do yesterday? What should I fix?
+Agent:  Lohasutra's daily budget ran out at 13:34; after that 1,318 more conversations matched it
+        but got no ad from it. It had your best CTR (5.6%). Raise it from ₹90 to about ₹300?
+You:    Lohasutra said yes. Do it.
+Agent:  (asks you to approve the tool call) Done: ₹90 -> ₹300, logged.
+```
+
+| Tool | Key | What it does |
+| --- | --- | --- |
+| `ads_overview` | admin, advertiser | One day: totals, spend against budget, when a budget ran out, matches lost to budget, fill rate per placement, and a plain-words "needs attention" list |
+| `campaign_report` | admin, advertiser | Settings and day-by-day results for one campaign |
+| `delivery_report` | admin | Fill rate per placement and why requests got no ad (sensitive topic, nothing relevant, budget, frequency cap, floor price) |
+| `advertiser_report` | admin, advertiser | A Markdown report you can send to an advertiser as is |
+| `recent_changes` | admin | The audit log: who changed what, before and after |
+| `update_campaign_settings` | admin | Pause or resume a campaign, change its daily or lifetime budget or bid |
+
+The agent only ever sees counts and money. Aside never stores conversations, so there is nothing else to
+show it. An advertiser key sees that advertiser's campaigns only and cannot change anything, so you can
+give each advertiser their own read-only connection to their numbers.
+
+`update_campaign_settings` is marked as changing data, and the server tells the agent to confirm the exact
+change with you first. Claude Code asks for your approval before each call by default (that is the
+prompt in the example above). Every change is written to the audit log with the values before and after.
+
+**Clients that send headers** (Claude Code, Cursor, scripts): pass an admin or advertiser key.
+
+```bash
+claude mcp add --transport http aside https://ads.example.com/mcp --header "Authorization: Bearer $ASIDE_ADMIN_KEY"
+```
+
+**Clients that use OAuth** (claude.ai and Claude Desktop custom connectors, ChatGPT): add
+`https://ads.example.com/mcp` as a custom connector. The client registers itself and opens Aside's
+`/connect` page, where you paste an admin or advertiser key to approve. Tokens are stored as hashes and tied
+to that key: revoke the key in the dashboard and the connection stops. Set `ASIDE_PUBLIC_URL` to the
+public HTTPS address so the OAuth metadata is right; web clients cannot reach `localhost`.
+
+Turn the connector off with `ASIDE_CONNECTOR=false`. To try it without real traffic,
+[`examples/agent-demo`](examples/agent-demo) fills a demo database with a simulated day of chats.
 
 ## How it works
 
@@ -223,6 +271,9 @@ applies a per-IP rate limit.
   database, to logs, or to any cache. Neither is its embedding or the detected categories.
 - Stored per event: kind, request id, campaign and creative ids, publisher and placement, cost, a keyed
   HMAC of the user id (never the raw id), timestamp, and country/region only if you send them.
+- Stored per day: how many serve requests each placement got and how each ended (`filled` or the no-ad
+  reason), and how many matches each campaign lost to its budget. Counts only; they feed the reports.
+- The agent connector returns these aggregates and campaign settings, nothing else.
 - `tests/test_privacy.py` sends conversations containing a unique marker through serve, impression, click
   and conversion, then scans every column of every table and the raw SQLite files for it.
 - Aside makes no outbound calls with user data. The only outbound request is the one-time model download.
@@ -244,6 +295,8 @@ available as JSON under `/v1/admin` (see `/docs`).
 | `POST /v1/impressions` | publisher key | Server-side impression |
 | `POST /v1/conversions`, `GET /v1/conversions?click_id=&key=` | advertiser or admin key | Conversion postback |
 | `/v1/admin/*` | admin key | Advertisers, campaigns, creatives, publishers, keys, stats |
+| `/mcp` | admin or advertiser key, or an OAuth token | Agent connector (MCP, streamable HTTP) |
+| `/connect`, `/authorize`, `/token`, `/register` | none (approval needs a key) | OAuth for agent connections |
 
 Keys go in `Authorization: Bearer <key>` (or `X-API-Key`). The `GET` conversion form exists for
 pixel-style postbacks; a key in a query string can end up in access logs, so prefer `POST` with a header.
@@ -270,7 +323,7 @@ value on every instance. All settings are listed in [`.env.example`](.env.exampl
 | Revenue share | None | The network keeps a share |
 | Control over advertisers and topics | Full | Within the network's settings |
 | Ad presentation | Separate labeled card beside the answer | Varies by network |
-| Operations | You host it and run your own sales | Add an SDK and an account |
+| Operations | You host it and run your own sales; your AI agent can do the day-to-day ad ops | Add an SDK and an account |
 | Cost | Your server | Revenue share |
 
 If you need demand you do not have, a network is the practical choice. Aside is for when you have, or want
@@ -278,7 +331,10 @@ to build, direct relationships, or cannot send chats to a third party.
 
 ## Roadmap
 
-- Fill-rate and request reporting per placement.
+- Ads for always-on agents: a `digest` placement (one labeled sponsored line in a morning brief or a
+  finished-task report, matched on your server) and a `shortlist` placement (one labeled option under
+  the agent's own pick, never acted on without the user choosing it), with a reference OpenClaw plugin.
+- Agent tools for advertisers: draft a campaign for review, and alerts when a budget is about to run out.
 - Multilingual defaults and per-language thresholds; more sensitive-term packs.
 - More creative formats (image cards, product cards) and CTR-based creative rotation.
 - Stronger invalid-traffic detection and viewability measurement.

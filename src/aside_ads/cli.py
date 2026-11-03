@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 
 from aside_ads import __version__
@@ -42,6 +43,8 @@ def cmd_serve(args: argparse.Namespace, settings: Settings) -> int:
 
     _prepare_db(settings)
     settings.resolved_secret()  # create the secret before workers start
+    # Workers build their own Settings; tell them the port so local agent URLs match.
+    os.environ.setdefault("ASIDE_PORT", str(args.port))
     uvicorn.run(
         "aside_ads.app:create_app",
         factory=True,
