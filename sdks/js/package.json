@@ -1,6 +1,6 @@
 {
   "name": "aside-ads",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript/JavaScript client for Aside, the self-hosted ad server for AI chat apps.",
   "license": "MIT",
   "author": "Pritom Mazumdar",
@@ -13,18 +13,35 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"
   },
-  "repository": { "type": "git", "url": "https://github.com/Pritom14/aside-ads.git", "directory": "sdks/js" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pritom14/aside-ads.git",
+    "directory": "sdks/js"
+  },
   "homepage": "https://github.com/Pritom14/aside-ads/tree/main/sdks/js#readme",
   "bugs": "https://github.com/Pritom14/aside-ads/issues",
-  "keywords": ["ads", "ad-server", "llm", "chatbot", "privacy", "self-hosted"],
+  "keywords": [
+    "ads",
+    "ad-server",
+    "llm",
+    "chatbot",
+    "privacy",
+    "self-hosted"
+  ],
   "devDependencies": {
     "typescript": "^5.4.0"
   }

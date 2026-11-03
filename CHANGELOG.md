@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-03
+
 ### Agent connector
 
 - Aside is a remote MCP server at `/mcp` (streamable HTTP, stateless), so Claude, ChatGPT and other MCP
@@ -88,4 +90,5 @@ First public release.
 - Chat demo app with fictional advertisers, and a hosted demo image (`docker build --target demo`) with
   Fly.io and Hugging Face Spaces configs.
 
+[0.2.0]: https://github.com/Pritom14/aside-ads/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Pritom14/aside-ads/releases/tag/v0.1.0
