@@ -6,4 +6,4 @@ never written to the database, logs, or caches. See ``aside_ads.serving`` and
 ``tests/test_privacy.py``, which scans every table for conversation text.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

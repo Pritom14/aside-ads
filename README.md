@@ -7,7 +7,7 @@ An open-source, self-hosted ad server for AI chat apps. Conversations never leav
 An HTML `<aside>` sits beside the main content. Aside ads work the same way: a card labeled
 "Sponsored" next to the model's answer, never inside it.
 
-Status: early (v0.2). The API may change before 1.0.
+Status: early (v0.3). The API may change before 1.0.
 
 **[Try the hosted demo](https://aside-ads.onrender.com)**: Rasoi AI, a free cooking assistant, with sponsored cards beside relevant answers.
 <!-- TODO: replace the link with the Fly.io or Hugging Face URL after deploying (see deploy/README.md). -->

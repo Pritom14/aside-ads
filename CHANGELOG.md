@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
 ### Sponsor pages
 
 - A public sponsor page per app at `/sponsor/<slug>`, off until turned on in the dashboard (Sponsors): the
@@ -118,5 +120,6 @@ First public release.
 - Chat demo app with fictional advertisers, and a hosted demo image (`docker build --target demo`) with
   Fly.io and Hugging Face Spaces configs.
 
+[0.3.0]: https://github.com/Pritom14/aside-ads/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Pritom14/aside-ads/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Pritom14/aside-ads/releases/tag/v0.1.0

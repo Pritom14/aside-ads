@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence, Union  # noqa: UP035 (Python 3.9 support)
 
 __all__ = ["AsideClient", "AsyncAsideClient", "SponsoredAd", "AsideError"]
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 log = logging.getLogger("aside_ads_client")
 
