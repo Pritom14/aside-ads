@@ -1,9 +1,10 @@
 """Fill a demo Aside database with simulated traffic, to try the agent connector without real users.
 
-Seeds the cooking demo (the "Rasoi AI" app and five advertisers, amounts in INR), then replays a
-day of chat traffic for yesterday and today up to now: serves, impressions, clicks and a few
-conversions, through the real API in-process. One advertiser spends its daily budget early, some
-questions have no relevant campaign, and a few are sensitive, so the reports have something to say.
+Seeds the cooking demo (the "Rasoi AI" app and five advertisers, amounts in INR), then replays a day
+of chat traffic for yesterday and today up to now (``--days`` for more history): serves,
+impressions, clicks and a few conversions, through the real API in-process. One advertiser spends
+its daily budget early, some questions have no relevant campaign, and a few are sensitive, so the
+reports have something to say.
 
     python examples/agent-demo/simulate.py --data-dir .aside-agent-demo
     export ASIDE_DATA_DIR=.aside-agent-demo ASIDE_TIMEZONE=Asia/Kolkata ASIDE_CURRENCY=INR
@@ -148,7 +149,7 @@ def _question(rng: random.Random) -> tuple[str | None, str]:
     return group[0], rng.choice(group[2])
 
 
-async def simulate(data_dir: Path, per_day: int, seed: int) -> dict[str, Any]:
+async def simulate(data_dir: Path, per_day: int, seed: int, days: int = 2) -> dict[str, Any]:
     tz = ZoneInfo("Asia/Kolkata")
     settings = Settings(
         _env_file=None,
@@ -187,7 +188,8 @@ async def simulate(data_dir: Path, per_day: int, seed: int) -> dict[str, Any]:
     now = datetime.now(tz)
     today = datetime.combine(now.date(), time.min, tzinfo=tz)
     counts = {"requests": 0, "ads": 0, "clicks": 0, "conversions": 0}
-    for day, until in ((today - timedelta(days=1), None), (today, now)):
+    past = [(today - timedelta(days=k), None) for k in range(max(days, 1) - 1, 0, -1)]
+    for day, until in [*past, (today, now)]:
         for local in _times(day, per_day, until, rng):
             t = local.astimezone(timezone.utc)  # the server clock runs in UTC
             rt.clock = lambda t=t: t
@@ -236,8 +238,9 @@ def main() -> None:
     p.add_argument("--data-dir", type=Path, default=Path(".aside-agent-demo"))
     p.add_argument("--per-day", type=int, default=5000, help="chats per simulated day")
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--days", type=int, default=2, help="days to simulate, ending with today so far")
     args = p.parse_args()
-    out = asyncio.run(simulate(args.data_dir, args.per_day, args.seed))
+    out = asyncio.run(simulate(args.data_dir, args.per_day, args.seed, args.days))
     print(
         f"Simulated {out['requests']:,} chats: {out['ads']:,} ads, {out['clicks']:,} clicks, "
         f"{out['conversions']:,} conversions. Keys are in {out['admin_key_file']}."

@@ -7,6 +7,34 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Sponsor pages
+
+- A public sponsor page per app at `/sponsor/<slug>`, off until turned on in the dashboard (Sponsors): the
+  app's description, languages and countries, placements with minimum prices (per 1,000 views and per
+  click, from the floor), and audience numbers from Aside's own counts. Numbers cover complete days in the
+  last 30, are rounded to two significant figures, and are hidden below 300 conversations (100 per topic).
+- Advertisers send a sponsorship request from the page (company, contact, bid, budgets, dates, placement
+  and the ad). It is validated against the floor and the page's minimum daily budget; spam is limited by a
+  honeypot field, `ASIDE_SPONSOR_REQUESTS_PER_HOUR` (5) per IP and `ASIDE_SPONSOR_MAX_PENDING` (200).
+- Approve or decline in the dashboard, or through the agent connector with the new `sponsor_requests` and
+  `review_sponsor_request` tools. Approving creates the advertiser, the campaign and its creative, and is
+  written to the audit log (`via` is `dashboard` or `agent`). The dashboard can then issue the advertiser a
+  read-only key. Request text is returned to agents under `from_sender` and marked as untrusted.
+- `/sponsor/<slug>.json` (the listing as data) and `/.well-known/aside.json` (the sponsor pages on a
+  server), with CORS open, for directories and buyer agents.
+- Topic counts: each non-sensitive serve request adds 1 per detected topic to a per-day count
+  (`topic_counts` table). `delivery_report` now lists topics by conversations that got no ad.
+  `ASIDE_TOPIC_COUNTS=false` turns this off.
+- `ads_overview` lists sponsorship requests waiting for review.
+- The cooking demo has a sponsor page (`/sponsor/rasoi-ai`), also on the hosted demo, where requests are
+  cleared at each reset. `examples/agent-demo/simulate.py --days N` simulates more history.
+- An issue form to list an app in the upcoming Aside Directory.
+
+### Changed
+
+- Topic terms: `rust` and `steam` no longer mark a conversation as software or gaming on their own (rusting
+  pans and pressure-cooker steam did), and food and cooking covers kitchen equipment and Indian dishes.
+
 ## [0.2.0] - 2026-11-03
 
 ### Agent connector

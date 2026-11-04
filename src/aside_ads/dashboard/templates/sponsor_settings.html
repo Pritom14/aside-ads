@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Sponsor page{% endblock %}
+{% block content %}
+<p><a href="/dashboard/sponsors">← Sponsors</a></p>
+<h1>Sponsor page for {{ pub.name }}</h1>
+{% if request.query_params.get('saved') %}<div class="flash ok">Saved.{% if v.enabled %} Your page is at <a href="/sponsor/{{ v.slug }}" target="_blank" rel="noopener">/sponsor/{{ v.slug }}</a>.{% endif %}</div>{% endif %}
+<form method="post" class="card">
+  <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if v.enabled }}> Page is public</label>
+  <div class="grid">
+    <label>Page address <input name="slug" value="{{ v.slug }}" pattern="[a-z0-9-]+"></label>
+    <label>Tagline <input name="tagline" maxlength="200" value="{{ v.tagline }}" placeholder="A free cooking assistant for Indian kitchens"></label>
+  </div>
+  <label>About the app <textarea name="about" rows="3">{{ v.about }}</textarea></label>
+  <label>Who uses it, in your words <textarea name="audience" rows="2" placeholder="Home cooks in Indian cities, mostly 25-45, asking in English and Hinglish">{{ v.audience }}</textarea></label>
+  <div class="grid">
+    <label>Languages (comma separated) <input name="languages" value="{{ v.languages }}"></label>
+    <label>Countries (comma separated) <input name="countries" value="{{ v.countries }}"></label>
+    <label>Minimum daily budget ({{ currency }}) <input name="min_daily_budget" value="{{ v.min_daily_budget }}"></label>
+  </div>
+  <fieldset><legend>Placements offered</legend>
+    {% for p in placements %}<label class="check"><input type="checkbox" name="placements" value="{{ p.key }}" {{ 'checked' if p.key in v.placements }}> {{ p.name or p.key }} <span class="muted mono">{{ p.key }}</span></label>{% endfor %}
+    <p class="muted">None ticked offers all of them.</p>
+  </fieldset>
+  <label class="check"><input type="checkbox" name="show_numbers" {{ 'checked' if v.show_numbers }}> Show audience numbers (rounded, complete days only, hidden below minimum counts)</label>
+  <label class="check"><input type="checkbox" name="accept_requests" {{ 'checked' if v.accept_requests }}> Take sponsorship requests</label>
+  <p><button>Save</button></p>
+</form>
+{% endblock %}

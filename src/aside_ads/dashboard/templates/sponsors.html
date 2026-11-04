@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Sponsors{% endblock %}
+{% block content %}
+<h1>Sponsors</h1>
+<p class="muted">Each app can have a public sponsor page where advertisers see your audience numbers and send a
+  sponsorship request. Nothing runs until you approve a request here (or through your agent).</p>
+
+<h2>Sponsor pages</h2>
+<table>
+  <tr><th>App</th><th>Page</th><th>Status</th><th></th></tr>
+  {% for p in publishers %}{% set page = pages.get(p.id) %}
+  <tr>
+    <td>{{ p.name }}</td>
+    <td>{% if page and page.enabled %}<a href="/sponsor/{{ page.slug }}" target="_blank" rel="noopener">/sponsor/{{ page.slug }}</a>{% else %}<span class="muted">-</span>{% endif %}</td>
+    <td>{% if page and page.enabled %}<span class="pill active">on{% if not page.accept_requests %}, not taking requests{% endif %}</span>{% else %}<span class="pill">off</span>{% endif %}</td>
+    <td><a href="/dashboard/sponsors/page/{{ p.id }}">{{ 'Edit' if page else 'Set up' }}</a></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">Add a publisher first.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Requests</h2>
+<table>
+  <tr><th>Received</th><th>Company</th><th>App</th><th class="r">Bid</th><th class="r">Daily budget</th><th>Status</th></tr>
+  {% for r in reqs %}
+  <tr>
+    <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at }}</td>
+    <td><a href="/dashboard/sponsors/requests/{{ r.id }}">{{ r.company }}</a></td>
+    <td>{{ pub_names.get(r.publisher_id, '') }}</td>
+    <td class="r">{{ r.bid_micros|money }} {{ 'CPM' if r.bid_type == 'cpm' else 'CPC' }}</td>
+    <td class="r">{{ r.daily_budget_micros|money }}</td>
+    <td><span class="pill {{ 'paused' if r.status == 'pending' else ('active' if r.status == 'approved' else 'archived') }}">{{ r.status }}</span></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6" class="muted">No requests yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

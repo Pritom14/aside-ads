@@ -4,7 +4,8 @@ This is what the ``demo`` Docker target runs (Fly.io, Hugging Face Spaces). It i
 public playground, not a production setup.
 
 * One port serves the chat page and ``/api/chat`` (``app.py`` next to this file),
-  plus the ad server's tracking (``/t/*``) and API (``/v1/*``) routes. The
+  plus the ad server's tracking (``/t/*``) and API (``/v1/*``) routes and its public
+  sponsor pages (``/sponsor/*``; requests sent there are cleared at each reset). The
   dashboard, ``/v1/admin`` and the server's API docs answer 404 to the public;
   set ``ASIDE_DEMO_DASHBOARD=1`` to expose them (they still need the admin key).
 * On boot it seeds the fictional demo campaigns if they are missing and issues a
@@ -50,7 +51,7 @@ log = logging.getLogger("aside.demo")
 Scope = MutableMapping[str, Any]
 ASGIApp = Callable[[Scope, Any, Any], Awaitable[None]]
 
-PUBLIC_PREFIXES = ("/t/", "/v1/", "/healthz")
+PUBLIC_PREFIXES = ("/t/", "/v1/", "/healthz", "/sponsor", "/.well-known/aside.json")
 ADMIN_PREFIXES = ("/v1/admin", "/dashboard")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
@@ -154,10 +155,10 @@ class AsideGate:
 async def _reset_activity(sessionmaker: Any) -> None:
     from sqlalchemy import delete, update
 
-    from aside_ads.models import BudgetReservation, Campaign, Conversion, DailyStat, Event
+    from aside_ads.models import BudgetReservation, Campaign, Conversion, DailyStat, Event, SponsorRequest
 
     async with sessionmaker() as s, s.begin():
-        for model in (Event, Conversion, DailyStat, BudgetReservation):
+        for model in (Event, Conversion, DailyStat, BudgetReservation, SponsorRequest):
             await s.execute(delete(model))
         await s.execute(
             update(Campaign).values(

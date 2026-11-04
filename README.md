@@ -7,7 +7,7 @@ An open-source, self-hosted ad server for AI chat apps. Conversations never leav
 An HTML `<aside>` sits beside the main content. Aside ads work the same way: a card labeled
 "Sponsored" next to the model's answer, never inside it.
 
-Status: early (v0.1). The API may change before 1.0.
+Status: early (v0.2). The API may change before 1.0.
 
 **[Try the hosted demo](https://aside-ads.onrender.com)**: Rasoi AI, a free cooking assistant, with sponsored cards beside relevant answers.
 <!-- TODO: replace the link with the Fly.io or Hugging Face URL after deploying (see deploy/README.md). -->
@@ -195,6 +195,33 @@ public HTTPS address so the OAuth metadata is right; web clients cannot reach `l
 Turn the connector off with `ASIDE_CONNECTOR=false`. To try it without real traffic,
 [`examples/agent-demo`](examples/agent-demo) fills a demo database with a simulated day of chats.
 
+## Sell sponsorships directly
+
+Aside does not bring advertisers. A sponsor page helps them find you. Turn it on in the dashboard (Sponsors)
+and your server publishes `/sponsor/<your-app>`: what the app is, its placements and minimum prices, and
+audience numbers from Aside's own counts, with a form where an advertiser sends a sponsorship request.
+
+- **Audience numbers** come from per-day counts: conversations a day, the topics people ask about, and how
+  many conversations got no ad yet. They cover complete days only, are rounded to two significant figures,
+  and are hidden below minimum counts (300 conversations in 30 days, 100 per topic), so a small app never
+  publishes anything precise. You can hide them and share numbers on request instead.
+- **Requests** carry the company, contact, bid, daily and total budget, dates, placement and the ad itself.
+  Nothing runs until you approve. Approving in the dashboard (or through your agent with
+  `review_sponsor_request`) creates the advertiser, the campaign and the ad, and is written to the audit
+  log. You can then give the advertiser a read-only key so their own AI agent can follow their numbers.
+- **Spam limits**: a hidden honeypot field, 5 requests per IP per hour, and at most 200 pending per app
+  (`ASIDE_SPONSOR_REQUESTS_PER_HOUR`, `ASIDE_SPONSOR_MAX_PENDING`).
+- **Text in a request is untrusted.** The agent tools return it under `from_sender`, and the connector
+  tells agents never to follow instructions found there. Approving still needs your approval in the client.
+- **As data**: `/sponsor/<your-app>.json` is the same listing as JSON, and `/.well-known/aside.json` lists
+  the sponsor pages on a server. A directory or a buyer's agent can read them.
+
+The cooking demo has one: `aside seed-demo --scenario cooking`, then open `/sponsor/rasoi-ai`.
+
+**Aside Directory**: a public list of AI apps that sell sponsorships from their own sponsor page, so
+advertisers can find them in one place. It opens once 15 apps are listed.
+[List your app](https://github.com/Pritom14/aside-ads/issues/new?template=list-my-app.yml).
+
 ## How it works
 
 ```
@@ -268,12 +295,17 @@ applies a per-IP rate limit.
 ## Privacy guarantees
 
 - The `context` you send is used in memory for one request and discarded. It is not written to the
-  database, to logs, or to any cache. Neither is its embedding or the detected categories.
+  database, to logs, or to any cache. Neither is its embedding. Its detected topics only add 1 to a
+  per-day count for each fixed topic name (`travel`, `food_cooking`, ...); turn that off with
+  `ASIDE_TOPIC_COUNTS=false`.
 - Stored per event: kind, request id, campaign and creative ids, publisher and placement, cost, a keyed
   HMAC of the user id (never the raw id), timestamp, and country/region only if you send them.
 - Stored per day: how many serve requests each placement got and how each ended (`filled` or the no-ad
   reason), and how many matches each campaign lost to its budget. Counts only; they feed the reports.
-- The agent connector returns these aggregates and campaign settings, nothing else.
+- The agent connector returns these aggregates and campaign settings, nothing else. Sponsor pages publish
+  them rounded and only above minimum counts.
+- Sponsorship requests store what the sender typed into the form, including their name and email, so you
+  can reply. Nothing about your users is in them.
 - `tests/test_privacy.py` sends conversations containing a unique marker through serve, impression, click
   and conversion, then scans every column of every table and the raw SQLite files for it.
 - Aside makes no outbound calls with user data. The only outbound request is the one-time model download.
@@ -282,7 +314,8 @@ applies a per-IP rate limit.
 
 `/dashboard`, logged in with an admin key: create advertisers, campaigns and creatives, set bids, budgets,
 pacing, caps and targeting, manage publishers, placements and API keys, and see impressions, clicks, CTR,
-spend and conversions per campaign and day. Server-rendered Jinja2, no build step. The same operations are
+spend and conversions per campaign and day, and set up sponsor pages and review sponsorship requests.
+Server-rendered Jinja2, no build step. The same operations are
 available as JSON under `/v1/admin` (see `/docs`).
 
 ## API
@@ -297,6 +330,9 @@ available as JSON under `/v1/admin` (see `/docs`).
 | `/v1/admin/*` | admin key | Advertisers, campaigns, creatives, publishers, keys, stats |
 | `/mcp` | admin or advertiser key, or an OAuth token | Agent connector (MCP, streamable HTTP) |
 | `/connect`, `/authorize`, `/token`, `/register` | none (approval needs a key) | OAuth for agent connections |
+| `GET /sponsor/<slug>`, `GET /sponsor/<slug>.json` | none | Public sponsor page, and the same listing as JSON |
+| `POST /sponsor/<slug>/request` | none (rate limited) | Send a sponsorship request |
+| `GET /.well-known/aside.json` | none | The sponsor pages on this server, for directories |
 
 Keys go in `Authorization: Bearer <key>` (or `X-API-Key`). The `GET` conversion form exists for
 pixel-style postbacks; a key in a query string can end up in access logs, so prefer `POST` with a header.
@@ -319,7 +355,7 @@ value on every instance. All settings are listed in [`.env.example`](.env.exampl
 | | Aside | Contextual AI ad networks |
 | --- | --- | --- |
 | Where conversation context goes | Stays on your server | Sent to the network to match ads |
-| Advertiser demand | None included: you find and sell to advertisers | The network brings advertisers and fills inventory from day one |
+| Advertiser demand | None included: you sell to advertisers, and your sponsor page helps them find you | The network brings advertisers and fills inventory from day one |
 | Revenue share | None | The network keeps a share |
 | Control over advertisers and topics | Full | Within the network's settings |
 | Ad presentation | Separate labeled card beside the answer | Varies by network |
@@ -331,6 +367,10 @@ to build, direct relationships, or cannot send chats to a third party.
 
 ## Roadmap
 
+- The Aside Directory: one place where advertisers find AI apps with sponsor pages, built from their
+  listing files. Opens at 15 listed apps ([list yours](https://github.com/Pritom14/aside-ads/issues/new?template=list-my-app.yml)).
+- Buyer agents: the sponsor listing and request flow as MCP tools and as an AdCP sales agent, so an
+  advertiser's agent can find an app, request a campaign and read its delivery.
 - Ads for always-on agents: a `digest` placement (one labeled sponsored line in a morning brief or a
   finished-task report, matched on your server) and a `shortlist` placement (one labeled option under
   the agent's own pick, never acted on without the user choosing it), with a reference OpenClaw plugin.

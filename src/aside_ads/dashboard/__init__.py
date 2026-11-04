@@ -15,9 +15,19 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from aside_ads import sponsor
 from aside_ads.api.deps import get_runtime
 from aside_ads.auth import create_api_key, lookup_key
-from aside_ads.models import Advertiser, ApiKey, Creative, utcnow
+from aside_ads.models import (
+    Advertiser,
+    ApiKey,
+    Creative,
+    Placement,
+    Publisher,
+    SponsorPage,
+    SponsorRequest,
+    utcnow,
+)
 from aside_ads.runtime import Runtime
 from aside_ads.schemas import CampaignIn, CampaignPatch, CreativeIn, from_micros, to_micros
 from aside_ads.services import (
@@ -560,3 +570,201 @@ async def revoke_key_form(key_id: str, rt: Runtime = Depends(get_runtime)) -> Re
             k.revoked_at = utcnow()
             await s.commit()
     return RedirectResponse("/dashboard/publishers", status_code=303)
+
+
+# --------------------------------------------------------------------------- sponsor pages and requests
+
+
+def _actor(key: ApiKey) -> str:
+    return f"{key.name or key.role} ({key.prefix}...)"
+
+
+async def _sponsors_page(request: Request, rt: Runtime, status_code: int = 200, **extra: Any) -> HTMLResponse:
+    async with rt.sessionmaker() as s:
+        pubs = await list_publishers(s)
+        pages = {p.publisher_id: p for p in (await s.execute(select(SponsorPage))).scalars().all()}
+        reqs = list(
+            (
+                await s.execute(
+                    select(SponsorRequest)
+                    .order_by((SponsorRequest.status == "pending").desc(), SponsorRequest.created_at.desc())
+                    .limit(200)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    return render(
+        request,
+        "sponsors.html",
+        rt,
+        status_code,
+        publishers=pubs,
+        pages=pages,
+        reqs=reqs,
+        pub_names={p.id: p.name for p in pubs},
+        **extra,
+    )
+
+
+@protected.get("/sponsors")
+async def sponsors_page(request: Request, rt: Runtime = Depends(get_runtime)) -> HTMLResponse:
+    return await _sponsors_page(request, rt)
+
+
+async def _settings_page(
+    request: Request, rt: Runtime, publisher_id: str, status_code: int = 200, **extra: Any
+) -> HTMLResponse:
+    async with rt.sessionmaker() as s:
+        pub = await s.get(Publisher, publisher_id)
+        if pub is None:
+            return HTMLResponse("Publisher not found", status_code=404)
+        page = await s.get(SponsorPage, publisher_id)
+        placements = list(
+            (
+                await s.execute(
+                    select(Placement).where(Placement.publisher_id == pub.id).order_by(Placement.key)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    v = extra.pop("v", None) or {
+        "enabled": bool(page and page.enabled),
+        "slug": page.slug if page else sponsor.slugify(pub.name),
+        "tagline": page.tagline if page else "",
+        "about": page.about if page else "",
+        "audience": page.audience if page else "",
+        "languages": ", ".join(page.languages) if page else "",
+        "countries": ", ".join(page.countries) if page else "",
+        "placements": list(page.placements) if page else [],
+        "min_daily_budget": _fmt(from_micros(page.min_daily_budget_micros)) if page else "",
+        "show_numbers": page.show_numbers if page else True,
+        "accept_requests": page.accept_requests if page else True,
+    }
+    return render(
+        request, "sponsor_settings.html", rt, status_code, pub=pub, placements=placements, v=v, **extra
+    )
+
+
+@protected.get("/sponsors/page/{publisher_id}")
+async def sponsor_settings(
+    publisher_id: str, request: Request, rt: Runtime = Depends(get_runtime)
+) -> HTMLResponse:
+    return await _settings_page(request, rt, publisher_id)
+
+
+def _list_field(raw: Any) -> list[str]:
+    return [x.strip() for x in str(raw or "").split(",") if x.strip()][:20]
+
+
+@protected.post("/sponsors/page/{publisher_id}")
+async def save_sponsor_settings(
+    publisher_id: str, request: Request, rt: Runtime = Depends(get_runtime)
+) -> Response:
+    form = await request.form()
+    v = {
+        "enabled": form.get("enabled") == "on",
+        "slug": (_blank(form.get("slug")) or "").lower(),
+        "tagline": str(form.get("tagline", "")).strip()[:200],
+        "about": str(form.get("about", "")).strip()[:4000],
+        "audience": str(form.get("audience", "")).strip()[:2000],
+        "languages": str(form.get("languages", "")),
+        "countries": str(form.get("countries", "")),
+        "placements": [str(x) for x in form.getlist("placements")],
+        "min_daily_budget": str(form.get("min_daily_budget", "")).strip(),
+        "show_numbers": form.get("show_numbers") == "on",
+        "accept_requests": form.get("accept_requests") == "on",
+    }
+    if not sponsor.SLUG_RE.fullmatch(v["slug"]):
+        return await _settings_page(
+            request, rt, publisher_id, 422, v=v, error="Page address: lowercase letters, digits and dashes."
+        )
+    try:
+        min_budget = to_micros(v["min_daily_budget"] or None)
+    except Exception:
+        return await _settings_page(
+            request, rt, publisher_id, 422, v=v, error="Minimum daily budget must be a number."
+        )
+    async with rt.sessionmaker() as s:
+        if await s.get(Publisher, publisher_id) is None:
+            return HTMLResponse("Publisher not found", status_code=404)
+        page = await s.get(SponsorPage, publisher_id) or SponsorPage(publisher_id=publisher_id)
+        page.enabled, page.slug = v["enabled"], v["slug"]
+        page.tagline, page.about, page.audience = v["tagline"], v["about"], v["audience"]
+        page.languages, page.countries = _list_field(v["languages"]), _list_field(v["countries"])
+        page.placements, page.min_daily_budget_micros = v["placements"], min_budget
+        page.show_numbers, page.accept_requests = v["show_numbers"], v["accept_requests"]
+        s.add(page)
+        try:
+            await s.commit()
+        except IntegrityError:
+            return await _settings_page(
+                request, rt, publisher_id, 422, v=v, error="Another app already uses that page address."
+            )
+    return RedirectResponse(f"/dashboard/sponsors/page/{publisher_id}?saved=1", status_code=303)
+
+
+async def _request_page(
+    request: Request, rt: Runtime, request_id: str, status_code: int = 200, **extra: Any
+) -> HTMLResponse:
+    async with rt.sessionmaker() as s:
+        r = await s.get(SponsorRequest, request_id)
+        if r is None:
+            return HTMLResponse("Request not found", status_code=404)
+        pub = await s.get(Publisher, r.publisher_id)
+    return render(
+        request,
+        "sponsor_request.html",
+        rt,
+        status_code,
+        r=r,
+        pub=pub,
+        public_url=(rt.settings.public_url or str(request.base_url)).rstrip("/"),
+        **extra,
+    )
+
+
+@protected.get("/sponsors/requests/{request_id}")
+async def sponsor_request_page(
+    request_id: str, request: Request, rt: Runtime = Depends(get_runtime)
+) -> HTMLResponse:
+    return await _request_page(request, rt, request_id)
+
+
+@protected.post("/sponsors/requests/{request_id}/{decision}")
+async def decide_sponsor_request(
+    request_id: str,
+    decision: str,
+    request: Request,
+    rt: Runtime = Depends(get_runtime),
+    key: ApiKey = Depends(admin_session),
+) -> Response:
+    form = await request.form()
+    note = str(form.get("note", "")).strip()[:2000]
+    async with rt.sessionmaker() as s:
+        try:
+            if decision == "approve":
+                await sponsor.approve(
+                    s, rt, request_id, actor=_actor(key), via="dashboard", api_key_id=key.id, note=note
+                )
+            elif decision == "decline":
+                await sponsor.decline(
+                    s, request_id, actor=_actor(key), via="dashboard", api_key_id=key.id, note=note
+                )
+            elif decision == "key":
+                r = await s.get(SponsorRequest, request_id)
+                if r is None or r.status != "approved" or not r.advertiser_id:
+                    raise sponsor.RequestError("Approve the request first.")
+                k, plaintext = await create_api_key(
+                    s, "advertiser", f"{r.company} (sponsor page)"[:200], advertiser_id=r.advertiser_id
+                )
+                await s.commit()
+                return await _request_page(request, rt, request_id, new_key=plaintext)
+            else:
+                return HTMLResponse("Unknown action", status_code=404)
+            await s.commit()
+        except (sponsor.RequestError, ValidationError, NotFound) as exc:
+            await s.rollback()
+            return await _request_page(request, rt, request_id, 422, error=str(exc))
+    return RedirectResponse(f"/dashboard/sponsors/requests/{request_id}", status_code=303)
