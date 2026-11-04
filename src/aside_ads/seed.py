@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aside_ads.auth import create_api_key, lookup_key
-from aside_ads.models import Advertiser, Placement, Publisher
+from aside_ads.models import Advertiser, Placement, Publisher, SponsorPage
 from aside_ads.schemas import CampaignIn, CreativeIn
 from aside_ads.services import add_creative, add_placement, create_campaign, create_publisher
 
@@ -224,15 +224,43 @@ COOKING_ADS: list[DemoAd] = [
 
 
 @dataclass(frozen=True)
+class DemoPage:
+    """The scenario's public sponsor page (``/sponsor/<slug>``)."""
+
+    slug: str
+    tagline: str
+    about: str
+    audience: str
+    languages: tuple[str, ...]
+    countries: tuple[str, ...]
+    min_daily_budget: Decimal | None = None
+
+
+COOKING_PAGE = DemoPage(
+    slug="rasoi-ai",
+    tagline="A free cooking assistant for Indian kitchens",
+    about=(
+        "Rasoi AI answers everyday cooking questions: recipes, techniques, rescuing a dish that went wrong, "
+        "and what to buy. It is free to use and paid for by a few sponsors, shown beside the answer."
+    ),
+    audience="Home cooks in Indian cities, asking in English and Hinglish. Busiest around lunch and dinner.",
+    languages=("English", "Hinglish"),
+    countries=("India",),
+    min_daily_budget=Decimal("200"),
+)
+
+
+@dataclass(frozen=True)
 class DemoScenario:
     publisher: str
     currency: str
     ads: list[DemoAd]
+    page: DemoPage | None = None
 
 
 SCENARIOS: dict[str, DemoScenario] = {
     "dev": DemoScenario(DEMO_PUBLISHER, "USD", DEMO_ADS),
-    "cooking": DemoScenario("Rasoi AI", "INR", COOKING_ADS),
+    "cooking": DemoScenario("Rasoi AI", "INR", COOKING_ADS, COOKING_PAGE),
 }
 
 
@@ -284,6 +312,23 @@ async def seed_demo(
             ).scalar_one_or_none()
             if exists is None:
                 await add_placement(s, pub.id, key, key.replace("-", " ").title())
+        if sc.page is not None and await s.get(SponsorPage, pub.id) is None:
+            s.add(
+                SponsorPage(
+                    publisher_id=pub.id,
+                    enabled=True,
+                    slug=sc.page.slug,
+                    tagline=sc.page.tagline,
+                    about=sc.page.about,
+                    audience=sc.page.audience,
+                    languages=list(sc.page.languages),
+                    countries=list(sc.page.countries),
+                    placements=[DEMO_PLACEMENT],
+                    min_daily_budget_micros=(
+                        int(sc.page.min_daily_budget * 1_000_000) if sc.page.min_daily_budget else None
+                    ),
+                )
+            )
 
         for ad in sc.ads:
             adv = (

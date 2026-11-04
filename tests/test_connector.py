@@ -191,10 +191,14 @@ async def test_mcp_needs_an_admin_or_advertiser_key(aw: tuple[World, httpx.Async
         "advertiser_report",
         "recent_changes",
         "update_campaign_settings",
+        "sponsor_requests",
+        "review_sponsor_request",
     }
     tools = {t["name"]: t for t in r.json()["result"]["tools"]}
     assert tools["ads_overview"]["annotations"]["readOnlyHint"] is True
+    assert tools["sponsor_requests"]["annotations"]["readOnlyHint"] is True
     assert tools["update_campaign_settings"]["annotations"]["destructiveHint"] is True
+    assert tools["review_sponsor_request"]["annotations"]["destructiveHint"] is True
 
 
 async def test_admin_overview_and_delivery_through_mcp(aw: tuple[World, httpx.AsyncClient]) -> None:

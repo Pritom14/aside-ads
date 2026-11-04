@@ -24,7 +24,7 @@ Each package has exactly one version string:
   `package-lock.json` follows)
 
 The packages are released together, so all three must equal the tag without its `v`. The workflow
-stops before publishing anything if they differ. All three are `0.2.0` today.
+stops before publishing anything if they differ. All three are `0.3.0` today.
 
 ## One-time setup (repository owner)
 

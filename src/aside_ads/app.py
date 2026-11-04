@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from aside_ads import __version__
-from aside_ads.api import admin, public, track
+from aside_ads.api import admin, public, sponsor, track
 from aside_ads.config import Settings
 from aside_ads.dashboard import HERE as DASHBOARD_DIR
 from aside_ads.dashboard import LoginRequired, protected
@@ -54,6 +54,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     app.include_router(public.router)
     app.include_router(track.router)
     app.include_router(admin.router)
+    app.include_router(sponsor.router)
     app.include_router(dashboard_router)
     app.include_router(protected)
     app.mount("/dashboard/static", StaticFiles(directory=str(DASHBOARD_DIR / "static")), name="static")

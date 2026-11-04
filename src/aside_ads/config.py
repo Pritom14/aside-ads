@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 120
     click_id_param: str = "aside_click_id"
 
+    # Sponsor pages ------------------------------------------------------------------
+    # Count conversations per day by topic (counts only). Sponsor pages and delivery reports use them.
+    topic_counts: bool = True
+    # Sponsorship requests accepted per client IP per hour, and the most a publisher can have pending.
+    sponsor_requests_per_hour: int = 5
+    sponsor_max_pending: int = 200
+
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:

@@ -15,7 +15,16 @@ from sqlalchemy.orm import selectinload
 
 from aside_ads.auction import impression_cost
 from aside_ads.delivery import OUTCOMES
-from aside_ads.models import AuditEntry, BudgetMiss, Campaign, DailyStat, Event, ServeOutcome
+from aside_ads.models import (
+    AuditEntry,
+    BudgetMiss,
+    Campaign,
+    DailyStat,
+    Event,
+    ServeOutcome,
+    SponsorRequest,
+    TopicCount,
+)
 from aside_ads.runtime import Runtime
 from aside_ads.schemas import from_micros
 
@@ -129,6 +138,17 @@ async def overview(rt: Runtime, day: str | None = None, advertiser_id: str | Non
             await s.execute(select(func.sum(ServeOutcome.requests)).where(ServeOutcome.day == day))
         ).scalar() or 0
         rows, attention = [], []
+        if advertiser_id is None:
+            waiting = (
+                await s.execute(
+                    select(func.count()).select_from(SponsorRequest).where(SponsorRequest.status == "pending")
+                )
+            ).scalar_one()
+            if waiting:
+                attention.append(
+                    f"{waiting} sponsorship request{'s' if waiting != 1 else ''} from your sponsor page "
+                    "waiting for review (see sponsor_requests)"
+                )
         for c in campaigns:
             st = stats.get(c.id)
             imps, clicks = (st.impressions, st.clicks) if st else (0, 0)
@@ -242,12 +262,44 @@ async def _delivery(s: AsyncSession, day_from: str, day_to: str) -> list[dict[st
     return out
 
 
+async def _topics(s: AsyncSession, day_from: str, day_to: str) -> list[dict[str, Any]]:
+    q = (
+        select(TopicCount.topic, func.sum(TopicCount.requests), func.sum(TopicCount.filled))
+        .where(TopicCount.day >= day_from, TopicCount.day <= day_to)
+        .group_by(TopicCount.topic)
+    )
+    out = []
+    for topic, requests, filled in (await s.execute(q)).all():
+        requests, filled = int(requests or 0), int(filled or 0)
+        out.append(
+            {
+                "topic": topic,
+                "conversations": requests,
+                "with_ad": filled,
+                "without_ad": requests - filled,
+                "fill_rate_pct": _pct(filled, requests),
+            }
+        )
+    return sorted(out, key=lambda x: -x["without_ad"])
+
+
 async def delivery(rt: Runtime, days: int = 1) -> dict[str, Any]:
-    """Fill rate per placement over the last ``days`` days, with why requests got no ad."""
+    """Fill rate per placement over the last ``days`` days, with why requests got no ad, and the
+    topics of conversations that got no ad (the sponsors worth finding)."""
     day_from, day_to = day_range(rt, days)
     async with rt.sessionmaker() as s:
         placements = await _delivery(s, day_from, day_to)
-    return {"from": day_from, "to": day_to, "placements": placements}
+        topics = await _topics(s, day_from, day_to)
+    return {
+        "from": day_from,
+        "to": day_to,
+        "placements": placements,
+        "topics": topics,
+        "topics_note": (
+            "Conversations per topic category (a conversation can have several; sensitive ones are not "
+            "counted). Topics with many conversations without an ad are where a new sponsor would fill."
+        ),
+    }
 
 
 async def campaign_report(rt: Runtime, campaign: Campaign, days: int = 7) -> dict[str, Any]:

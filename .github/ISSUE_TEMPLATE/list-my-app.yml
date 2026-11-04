@@ -1,0 +1,73 @@
+name: List my AI app in the Aside Directory
+description: Founding publishers for the Aside Directory, where advertisers find AI apps that sell sponsorships directly.
+title: "[Directory] "
+labels: ["directory"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Aside Directory will list AI apps that sell sponsorships directly, from their own Aside sponsor page.
+        It opens once 15 apps are listed here. Until then, this issue is your place in the queue.
+
+        Everything you write here is public. Do not post keys, revenue or anything private.
+  - type: input
+    id: app
+    attributes:
+      label: App name and link
+      placeholder: Rasoi AI, https://rasoi.example
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What do people ask it about?
+      description: A sentence or two. Advertisers choose apps by topic.
+      placeholder: Everyday cooking questions from home cooks in Indian cities.
+    validations:
+      required: true
+  - type: input
+    id: audience
+    attributes:
+      label: Languages and countries
+      placeholder: English and Hinglish, India
+  - type: dropdown
+    id: size
+    attributes:
+      label: Conversations a day (roughly)
+      options:
+        - Under 100
+        - 100 to 1,000
+        - 1,000 to 10,000
+        - More than 10,000
+        - Not launched yet
+    validations:
+      required: true
+  - type: dropdown
+    id: aside
+    attributes:
+      label: Do you run Aside?
+      options:
+        - Yes, with a public sponsor page
+        - Yes, without a sponsor page yet
+        - Not yet, planning to
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: Sponsor page link (if you have one)
+      placeholder: https://ads.rasoi.example/sponsor/rasoi-ai
+  - type: textarea
+    id: help
+    attributes:
+      label: Anything you need to get there?
+      description: Setup help, a placement type Aside does not have yet, a language it handles badly.
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Listing rules
+      options:
+        - label: Ads in my app are labeled Sponsored and never written into the model's answer.
+          required: true
+        - label: My app does not send users' conversations to advertisers.
+          required: true

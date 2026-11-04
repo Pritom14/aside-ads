@@ -150,8 +150,9 @@ TOPICS: dict[str, Category] = {
         Category(
             "software_development",
             terms=(
-                "code", "coding", "programming", "python", "javascript", "typescript", "java", "rust",
-                "golang", "api", "bug", "debug", "compile", "git", "github", "database", "sql",
+                "code", "coding", "programming", "python", "javascript", "typescript", "java", "rustlang",
+                "rust code", "rust programming", "borrow checker", "golang", "api", "bug", "debug",
+                "compile", "git", "github", "database", "sql",
                 "postgres", "deploy", "kubernetes", "docker", "ci", "framework", "react", "backend",
                 "frontend", "function", "query",
             ),
@@ -195,9 +196,16 @@ TOPICS: dict[str, Category] = {
             terms=(
                 "recipe", "cook", "cooking", "bake", "baking", "bread", "sourdough", "dinner", "lunch",
                 "breakfast", "restaurant", "vegan", "vegetarian", "ingredient", "oven", "curry",
+                "kitchen", "meal", "dish", "chef", "cuisine", "cookware", "cast iron", "frying pan",
+                "non stick", "nonstick", "pressure cooker", "mixer grinder", "wet grinder", "fry", "frying",
+                "grill", "roast", "boil", "marinade", "marinate", "dough", "flour", "cake", "dessert",
+                "snack", "spice", "spices", "chicken", "egg", "rice", "dal", "paneer", "curd", "roti",
+                "rotis", "chapati", "paratha", "biryani", "dosa", "idli", "masala", "chutney", "sabzi",
+                "tadka", "samosa", "kadhai", "kadai", "tawa",
             ),
             exemplars=(
                 "give me a recipe for banana bread", "what can I cook with rice and lentils",
+                "how do I stop my cast iron pan from rusting", "which pan is best for making dosa",
             ),
         ),
         Category(
@@ -260,7 +268,8 @@ TOPICS: dict[str, Category] = {
         Category(
             "gaming",
             terms=(
-                "game", "gaming", "playstation", "xbox", "steam", "nintendo", "minecraft", "valorant",
+                "game", "gaming", "playstation", "xbox", "steam deck", "steam game", "steam library",
+                "nintendo", "minecraft", "valorant",
             ),
             exemplars=(
                 "best settings for valorant on a low-end pc",

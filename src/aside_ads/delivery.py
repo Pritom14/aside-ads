@@ -1,8 +1,8 @@
-"""Daily delivery counts: how serve requests ended per placement, and matches lost to budget.
+"""Daily delivery counts: how serve requests ended per placement, matches lost to budget, and topics.
 
 Only counts are stored, keyed by day, publisher, placement and outcome (``filled`` or the no-ad
-reason), and by campaign for budget misses. Nothing about the conversation is recorded. A failure
-here is logged and never fails the serve request.
+reason), by campaign for budget misses, and by fixed topic name for topic counts. Nothing about the
+conversation is recorded. A failure here is logged and never fails the serve request.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from aside_ads.db import insert_for
-from aside_ads.models import BudgetMiss, ServeOutcome
+from aside_ads.models import BudgetMiss, ServeOutcome, TopicCount
 from aside_ads.runtime import Runtime
 
 log = logging.getLogger("aside.delivery")
@@ -33,7 +33,12 @@ OUTCOMES: dict[str, str] = {
 
 
 async def record_delivery(
-    rt: Runtime, publisher_id: str, placement_key: str, outcome: str | None, missed: list[str]
+    rt: Runtime,
+    publisher_id: str,
+    placement_key: str,
+    outcome: str | None,
+    missed: list[str],
+    topics: list[str] | None = None,
 ) -> None:
     now = rt.now()
     day = rt.day(now)
@@ -60,6 +65,20 @@ async def record_delivery(
                     miss.on_conflict_do_update(
                         index_elements=["campaign_id", "day"],
                         set_={"requests": BudgetMiss.requests + 1},
+                    )
+                )
+            filled = 1 if outcome == "filled" else 0
+            for topic in dict.fromkeys(topics or []):
+                row = insert_for(s, TopicCount).values(
+                    day=day, publisher_id=publisher_id, topic=topic[:64], requests=1, filled=filled
+                )
+                await s.execute(
+                    row.on_conflict_do_update(
+                        index_elements=["day", "publisher_id", "topic"],
+                        set_={
+                            "requests": TopicCount.requests + 1,
+                            "filled": TopicCount.filled + filled,
+                        },
                     )
                 )
             await s.commit()

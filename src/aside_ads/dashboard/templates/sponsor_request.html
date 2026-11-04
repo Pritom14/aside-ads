@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Sponsorship request{% endblock %}
+{% block content %}
+<p><a href="/dashboard/sponsors">← Sponsors</a></p>
+<h1>{{ r.company }} <span class="pill {{ 'paused' if r.status == 'pending' else ('active' if r.status == 'approved' else 'archived') }}">{{ r.status }}</span></h1>
+<p class="muted">For {{ pub.name if pub }} · received {{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at }} UTC · everything below was written by the sender.</p>
+{% if new_key %}
+<div class="flash ok">Read-only key for {{ r.company }}, shown once: <code class="key">{{ new_key }}</code><br>
+  Send it to {{ r.contact_email }}. With it they can connect their own AI agent at <code>{{ public_url }}/mcp</code>
+  to see their campaign's numbers, and nothing else.</div>
+{% endif %}
+<div class="grid">
+  <section class="card">
+    <h2>Budget</h2>
+    <p>Bid <b>{{ r.bid_micros|money }} {{ currency }}</b> {{ 'per 1,000 views' if r.bid_type == 'cpm' else 'per click' }}<br>
+      Daily budget <b>{{ r.daily_budget_micros|money }}</b>{% if r.total_budget_micros %} · total <b>{{ r.total_budget_micros|money }}</b>{% endif %}<br>
+      Placement {{ r.placement_key or 'any' }}{% if r.start_date or r.end_date %} · {{ r.start_date or 'now' }} to {{ r.end_date or 'no end date' }}{% endif %}</p>
+    <h2>Contact</h2>
+    <p>{{ r.contact_name }} · <a href="mailto:{{ r.contact_email }}">{{ r.contact_email }}</a><br>
+      <a href="{{ r.website }}" target="_blank" rel="noopener noreferrer">{{ r.website }}</a></p>
+  </section>
+  <section class="card">
+    <h2>The ad</h2>
+    <div class="adcard"><span class="label">Sponsored</span><strong>{{ r.headline }}</strong><p>{{ r.body }}</p><span class="cta">{{ r.cta }} →</span></div>
+    <p class="mono url">{{ r.url }}</p>
+    <h2>Conversations it fits</h2>
+    <p style="white-space: pre-line">{{ r.targeting_text }}</p>
+    {% if r.message %}<h2>Message</h2><p style="white-space: pre-line">{{ r.message }}</p>{% endif %}
+  </section>
+</div>
+{% if r.status == 'pending' %}
+<form method="post" class="card" action="/dashboard/sponsors/requests/{{ r.id }}/approve">
+  <label>Note (optional, kept with the decision) <input name="note" maxlength="2000"></label>
+  <div class="row">
+    <button>Approve and start the campaign</button>
+    <button formaction="/dashboard/sponsors/requests/{{ r.id }}/decline" class="danger">Decline</button>
+  </div>
+  <p class="muted">Approving creates the advertiser, a campaign with this budget and bid, and the ad. You can edit or pause it like any other campaign.</p>
+</form>
+{% else %}
+<div class="card">
+  <p>{{ r.status|capitalize }} {{ r.decided_at.strftime('%Y-%m-%d %H:%M') if r.decided_at }} UTC by {{ r.decided_by }}{% if r.decision_note %}: {{ r.decision_note }}{% endif %}</p>
+  {% if r.campaign_id %}<p><a href="/dashboard/campaigns/{{ r.campaign_id }}">Open the campaign</a></p>
+  <form method="post" action="/dashboard/sponsors/requests/{{ r.id }}/key" class="inline"><button class="small">Create a read-only key for {{ r.company }}</button></form>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

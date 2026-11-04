@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from aside_ads.auction import Candidate, clearing_price, impression_cost, predicted_ctr, rank
+from aside_ads.categories import TOPICS
 from aside_ads.delivery import record_delivery
 from aside_ads.matching import AdDoc, ContextAnalysis
 from aside_ads.models import Campaign, Creative, Placement, new_id
@@ -66,15 +67,26 @@ def _fc_key(campaign_id: str, user_hash: str) -> str:
 
 async def serve(rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str) -> ServeResponse:
     missed: list[str] = []
-    resp = await _serve(rt, publisher_id, req, base_url, missed)
-    await record_delivery(rt, publisher_id, req.placement, "filled" if resp.ad else resp.reason, missed)
+    topics: list[str] = []
+    resp = await _serve(rt, publisher_id, req, base_url, missed, topics)
+    outcome = "filled" if resp.ad else resp.reason
+    await record_delivery(rt, publisher_id, req.placement, outcome, missed, topics)
     return resp
 
 
 async def _serve(
-    rt: Runtime, publisher_id: str, req: ServeRequest, base_url: str, missed: list[str]
+    rt: Runtime,
+    publisher_id: str,
+    req: ServeRequest,
+    base_url: str,
+    missed: list[str],
+    topics: list[str],
 ) -> ServeResponse:
-    """Pick an ad. Appends to ``missed`` the campaigns that matched but were held back by budget."""
+    """Pick an ad.
+
+    Appends to ``missed`` the campaigns that matched but were held back by budget, and to ``topics``
+    the topic categories of the conversation (for counts only; sensitive conversations get none).
+    """
     request_id = new_id()
     now = rt.now()
     day = rt.day(now)
@@ -141,14 +153,19 @@ async def _serve(
         ctx = ContextAnalysis(req.context_text(), settings.max_context_chars)
         if rt.guard.classify(ctx, first_only=True):
             return "sensitive_context", []
+        hinted = {x.strip().lower() for x in req.categories}
+        found: set[str] | None = None
+        if settings.topic_counts:
+            found = hinted | {h.category for h in rt.topics.classify(ctx)}
+            topics.extend(sorted(t for t in found if t in TOPICS))
         # Campaigns held back by budget or pacing are scored too, so a match they lose is counted.
         pool = [c for c in campaigns if fits(c) and keywords_allow(c, ctx)]
         if not pool:
             return "no_eligible_campaigns", []
-        hinted = {x.strip().lower() for x in req.categories}
         if any(c.categories_include or c.categories_exclude for c in pool):
-            topics = hinted | {h.category for h in rt.topics.classify(ctx)}
-            pool = [c for c in pool if categories_allow(c, topics)]
+            if found is None:
+                found = hinted | {h.category for h in rt.topics.classify(ctx)}
+            pool = [c for c in pool if categories_allow(c, found)]
             if not pool:
                 return "no_eligible_campaigns", []
         active = {c.id: [cr for cr in c.creatives if cr.status == "active"] for c in pool}

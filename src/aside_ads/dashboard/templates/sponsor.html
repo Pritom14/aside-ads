@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sponsor {{ pub.name }}</title>
+<meta name="description" content="{{ page.tagline or ('Sponsor ' ~ pub.name) }}">
+<link rel="alternate" type="application/json" href="/sponsor/{{ page.slug }}.json">
+<style>
+:root { color-scheme: light; --bg: #f6f5f1; --card: #ffffff; --fg: #17181b; --muted: #62656c; --line: #e3e1da; --accent: #2457d6;
+  --accent-fg: #ffffff; --soft: #eef2fd; --ok-bg: #e5f4eb; --ok: #1d6f45; --bad-bg: #fdecea; --bad: #a8261b; --bar: #c9d6f7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --bg: #121316; --card: #1b1c20; --fg: #ececee;
+  --muted: #9b9ea6; --line: #2c2e33; --accent: #7ea3ff; --accent-fg: #0c1020; --soft: #1d2333; --ok-bg: #15301f; --ok: #7fd3a1;
+  --bad-bg: #3a1714; --bad: #ff9c8f; --bar: #2f3d63; } }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #121316; --card: #1b1c20; --fg: #ececee; --muted: #9b9ea6; --line: #2c2e33; --accent: #7ea3ff;
+  --accent-fg: #0c1020; --soft: #1d2333; --ok-bg: #15301f; --ok: #7fd3a1; --bad-bg: #3a1714; --bad: #ff9c8f; --bar: #2f3d63; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+.hero { padding: 48px 0 32px; border-bottom: 1px solid var(--line); }
+.eyebrow { margin: 0 0 6px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { margin: 0; font-size: clamp(32px, 6vw, 52px); line-height: 1.05; letter-spacing: -.02em; }
+.lede { margin: 12px 0 0; font-size: 20px; color: var(--muted); max-width: 640px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 24px; font-size: 14px; }
+.chip { padding: 2px 10px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); }
+.button, button { display: inline-block; padding: 11px 20px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg);
+  font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; text-decoration: none; cursor: pointer; }
+main { padding: 8px 16px 48px; }
+section { margin: 36px 0; }
+h2 { font-size: 22px; margin: 0 0 14px; letter-spacing: -.01em; }
+.grid2 { display: grid; grid-template-columns: 1.25fr 1fr; gap: 32px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.stats div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.stats b { display: block; font-size: 26px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.stats span { font-size: 13px; color: var(--muted); }
+.topics { list-style: none; margin: 0; padding: 0; }
+.topics li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.topics .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.topics .bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.topics small { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+.muted { color: var(--muted); } .small { font-size: 14px; }
+.mock { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; grid-template-columns: 1fr 180px; gap: 14px; }
+.mock .answer span { display: block; height: 9px; margin: 9px 0; border-radius: 5px; background: var(--line); }
+.mock .answer span:nth-child(2) { width: 92%; } .mock .answer span:nth-child(3) { width: 80%; } .mock .answer span:nth-child(4) { width: 60%; }
+.ad { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--card); font-size: 14px; }
+.ad .label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+.ad strong { display: block; } .ad p { margin: 4px 0; color: var(--muted); font-size: 13px; } .ad .cta { color: var(--accent); font-size: 13px; font-weight: 600; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: 0; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; counter-reset: step; }
+.steps div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-size: 15px; }
+.steps div::before { counter-increment: step; content: counter(step); display: inline-grid; place-items: center; width: 26px; height: 26px;
+  border-radius: 50%; background: var(--soft); color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+.steps b { display: block; margin-bottom: 4px; }
+form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+fieldset { border: 0; padding: 0; margin: 0 0 22px; min-width: 0; }
+legend { font-weight: 700; font-size: 17px; margin-bottom: 8px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.fields .wide { grid-column: 1 / -1; }
+label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0; }
+input, select, textarea { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; font: inherit; font-size: 15px; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+textarea { min-height: 84px; resize: vertical; }
+.radio { display: flex; gap: 16px; margin: 8px 0; font-size: 15px; color: var(--fg); }
+.radio label { display: inline-flex; gap: 6px; align-items: center; margin: 0; color: var(--fg); }
+.radio input { width: auto; margin: 0; }
+.adform { display: grid; grid-template-columns: 1fr 260px; gap: 18px; align-items: start; }
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.notice { padding: 14px 16px; border-radius: 10px; margin: 20px 0; }
+.notice.ok { background: var(--ok-bg); color: var(--ok); } .notice.bad { background: var(--bad-bg); color: var(--bad); }
+.notice ul { margin: 0; padding-left: 18px; }
+footer { border-top: 1px solid var(--line); padding: 24px 0 40px; font-size: 13px; color: var(--muted); }
+footer p { margin: 4px 0; }
+@media (max-width: 760px) {
+  .grid2, .adform, .steps { grid-template-columns: 1fr; }
+  .fields { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; } .stats div:last-child { grid-column: 1 / -1; }
+  .mock { grid-template-columns: 1fr; }
+  .hero { padding-top: 32px; }
+}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Sponsor this app</p>
+    <h1>{{ pub.name }}</h1>
+    {% if page.tagline %}<p class="lede">{{ page.tagline }}</p>{% endif %}
+    <div class="meta">
+      {% if d.app_url %}<a href="{{ d.app_url }}" rel="noopener">{{ pub.domain }}</a>{% endif %}
+      {% for l in page.languages %}<span class="chip">{{ l }}</span>{% endfor %}
+      {% for c in page.countries %}<span class="chip">{{ c }}</span>{% endfor %}
+    </div>
+    {% if page.accept_requests %}<a class="button" href="#request">Request a sponsorship</a>{% endif %}
+  </div>
+</header>
+
+<main class="wrap">
+  {% if sent %}<div class="notice ok" role="status"><strong>Request sent.</strong> {{ pub.name }} reviews every sponsor and will reply by email. Nothing runs until they approve it.</div>{% endif %}
+  {% if error %}<div class="notice bad" role="alert">{{ error }}</div>{% endif %}
+  {% if errors %}<div class="notice bad" role="alert"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+  <section class="grid2">
+    <div>
+      <h2>Audience</h2>
+      {% set a = d.audience %}
+      {% if a.enough %}
+      <div class="stats">
+        <div><b>~{{ "{:,}".format(a.conversations_per_day) }}</b><span>conversations a day</span></div>
+        <div><b>~{{ "{:,}".format(a.unfilled_per_day) }}</b><span>a day get no ad yet</span></div>
+        <div><b>{{ a.fill_pct }}%</b><span>shown an ad</span></div>
+      </div>
+      {% if a.topics %}
+      <ul class="topics">
+        {% for t in a.topics %}
+        <li><span>{{ t.label }}</span><span class="muted">{{ t.share_pct }}%</span>
+          <span class="bar"><i style="width: {{ [t.share_pct, 100]|min }}%"></i></span>
+          {% if t.unfilled_per_day %}<small>~{{ "{:,}".format(t.unfilled_per_day) }} a day with no ad</small>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      <p class="small muted">Share of conversations by topic, last {{ a.days }} day{{ '' if a.days == 1 else 's' }}. A conversation can count under more than one topic.</p>
+      {% endif %}
+      {% elif a.hidden %}
+      <p class="muted">{{ pub.name }} shares its numbers on request.</p>
+      {% else %}
+      <p class="muted">Not enough traffic yet to publish numbers. Ask {{ pub.name }} in your request.</p>
+      {% endif %}
+      {% if page.audience %}<p>{{ page.audience }}</p>{% endif %}
+    </div>
+    <div>
+      <h2>How ads appear</h2>
+      <div class="mock" aria-hidden="true">
+        <div class="answer"><span></span><span></span><span></span><span></span></div>
+        <div class="ad"><span class="label">Sponsored</span><strong>Your headline</strong><p>One or two lines about what you offer.</p><span class="cta">Learn more →</span></div>
+      </div>
+      <p class="small muted">One labeled card beside the answer, never inside it, and only when the conversation fits your ad.
+        No ads next to sensitive topics. Conversations stay on {{ pub.name }}'s own server: you get counts, never chats.</p>
+    </div>
+  </section>
+
+  {% if page.about %}<section><h2>About {{ pub.name }}</h2><p>{{ page.about }}</p></section>{% endif %}
+
+  <section>
+    <h2>Placements and prices</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Placement</th>{% if a.enough %}<th class="r">Conversations a day</th><th class="r">Ads a day</th>{% endif %}<th class="r">From, per 1,000 views</th><th class="r">From, per click</th></tr></thead>
+      <tbody>
+      {% for p in d.placements %}
+      <tr><td>{{ p.name }}</td>
+        {% if a.enough %}<td class="r">{{ "~{:,}".format(p.conversations_per_day) if p.conversations_per_day is defined else '-' }}</td>
+        <td class="r">{{ "~{:,}".format(p.ads_per_day) if p.ads_per_day is defined else '-' }}</td>{% endif %}
+        <td class="r">{{ money(p.min_cpm) }}</td><td class="r">{{ money(p.min_cpc) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <p class="small muted">Ads compete in a second-price auction, so you pay just enough to win and never more than your bid.
+      {% if d.min_daily_budget %}Minimum daily budget {{ money(d.min_daily_budget) }}.{% endif %} Prices in {{ d.currency }}.</p>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <div class="steps">
+      <div><b>Send a request</b>Your budget, your bid and the ad itself. Nothing is charged here.</div>
+      <div><b>{{ pub.name }} reviews it</b>Every sponsor is approved by hand. You hear back by email.</div>
+      <div><b>Your ad goes live</b>It shows next to conversations it fits. You get a report, or a read-only connection for your own AI agent.</div>
+    </div>
+  </section>
+
+  {% if page.accept_requests %}
+  <section id="request">
+    <h2>Request a sponsorship</h2>
+    <form method="post" action="/sponsor/{{ page.slug }}/request" novalidate>
+      <div class="hp" aria-hidden="true"><label>Leave this empty <input name="nickname" tabindex="-1" autocomplete="off"></label></div>
+      <fieldset><legend>You</legend><div class="fields">
+        <label>Company <input name="company" required maxlength="200" value="{{ v.company }}"></label>
+        <label>Website <input name="website" type="url" required placeholder="https://" value="{{ v.website }}"></label>
+        <label>Your name <input name="contact_name" required maxlength="200" value="{{ v.contact_name }}"></label>
+        <label>Email <input name="contact_email" type="email" required value="{{ v.contact_email }}"></label>
+      </div></fieldset>
+      <fieldset><legend>Budget</legend><div class="fields">
+        <label>Placement <select name="placement">
+          <option value="">Any placement</option>
+          {% for p in d.placements %}<option value="{{ p.key }}" {{ 'selected' if v.placement == p.key }}>{{ p.name }}</option>{% endfor %}
+        </select></label>
+        <div><label>Pay</label><div class="radio">
+          <label><input type="radio" name="bid_type" value="cpm" {{ 'checked' if v.bid_type != 'cpc' }}> per 1,000 views</label>
+          <label><input type="radio" name="bid_type" value="cpc" {{ 'checked' if v.bid_type == 'cpc' }}> per click</label>
+        </div></div>
+        <label>Bid ({{ d.currency }}) <input name="bid" inputmode="decimal" required value="{{ v.bid }}"></label>
+        <label>Daily budget ({{ d.currency }}) <input name="daily_budget" inputmode="decimal" required value="{{ v.daily_budget }}"></label>
+        <label>Total budget, optional <input name="total_budget" inputmode="decimal" value="{{ v.total_budget }}"></label>
+        <span></span>
+        <label>Start date, optional <input name="start_date" type="date" value="{{ v.start_date }}"></label>
+        <label>End date, optional <input name="end_date" type="date" value="{{ v.end_date }}"></label>
+      </div></fieldset>
+      <fieldset><legend>Your ad</legend><div class="adform"><div>
+        <label>Headline <input name="headline" required maxlength="90" value="{{ v.headline }}" data-preview="h"></label>
+        <label>Text <input name="body" maxlength="300" value="{{ v.body }}" data-preview="b"></label>
+        <div class="fields">
+          <label>Button text <input name="cta" maxlength="40" value="{{ v.cta }}" data-preview="c"></label>
+          <label>Link <input name="url" type="url" required placeholder="https://" value="{{ v.url }}"></label>
+        </div>
+        <label>Which conversations does it fit? One per line.
+          <textarea name="targeting_text" required maxlength="2000" placeholder="people asking how to stop cast iron from rusting&#10;choosing a pan for dosa">{{ v.targeting_text }}</textarea></label>
+      </div>
+      <div><label>Preview</label><div class="ad"><span class="label">Sponsored</span><strong id="ph">{{ v.headline or 'Your headline' }}</strong><p id="pb">{{ v.body or 'One or two lines about what you offer.' }}</p><span class="cta"><span id="pc">{{ v.cta or 'Learn more' }}</span> →</span></div></div>
+      </div></fieldset>
+      <fieldset><legend>Anything else?</legend>
+        <label>Message, optional <textarea name="message" maxlength="2000">{{ v.message }}</textarea></label>
+      </fieldset>
+      <button type="submit">Send request</button>
+      <p class="small muted">{{ pub.name }} sees what you send here. Nothing is charged until you agree terms with them.</p>
+    </form>
+  </section>
+  {% endif %}
+</main>
+
+<footer><div class="wrap">
+  <p>{{ d.numbers_note }}</p>
+  <p>Listing as data: <a href="/sponsor/{{ page.slug }}.json">{{ page.slug }}.json</a> · Runs on <a href="https://github.com/Pritom14/aside-ads" rel="noopener">Aside</a>, an open-source ad server for AI apps.</p>
+</div></footer>
+<script>
+for (const el of document.querySelectorAll("[data-preview]")) {
+  const out = document.getElementById("p" + el.dataset.preview);
+  const fallback = { h: "Your headline", b: "One or two lines about what you offer.", c: "Learn more" }[el.dataset.preview];
+  el.addEventListener("input", () => { out.textContent = el.value.trim() || fallback; });
+}
+</script>
+</body>
+</html>

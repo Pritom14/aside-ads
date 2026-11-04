@@ -1,6 +1,6 @@
 {
   "name": "aside-ads",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript/JavaScript client for Aside, the self-hosted ad server for AI chat apps.",
   "license": "MIT",
   "author": "Pritom Mazumdar",
